@@ -4,7 +4,11 @@
   "description": "An experiment to execute Graph Recipes scripts on a NodeJS infrastructure",
   "main": "experiment.js",
   "dependencies": {
-    "graphology": "^0.14.1"
+    "dom-parser": "^0.1.6",
+    "fs": "0.0.1-security",
+    "graphology": "^0.14.1",
+    "graphology-gexf": "^0.5.0",
+    "jsdom": "^15.2.1"
   },
   "devDependencies": {},
   "scripts": {

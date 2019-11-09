@@ -1,13 +1,16 @@
 const Graph = require('graphology');
+const jsdom = require("jsdom");
+const gexf = require('graphology-gexf/browser');
+// const fs = require('fs');
 
-const graph = new Graph();
-graph.addNode('John');
-graph.addNode('Martha');
-graph.addEdge('John', 'Martha');
-
-console.log('Number of nodes', graph.order);
-console.log('Number of edges', graph.size);
-
-graph.forEachNode(node => {
-  graph.forEachNeighbor(node, neighbor => console.log(node, neighbor));
-});
+// Read file
+/*var data;
+try {
+    data = fs.readFileSync('test.gexf', 'utf8');
+    console.log('GEXF file loaded');    
+} catch(e) {
+    console.log('Error:', e.stack);
+}
+*/
+// Reading a string
+// var graph = gexf.parse(Graph, data);
