@@ -1,0 +1,28 @@
+{
+  "name": "graph-recipes-node-experiment",
+  "version": "0.0.1",
+  "description": "An experiment to execute Graph Recipes scripts on a NodeJS infrastructure",
+  "main": "experiment.js",
+  "dependencies": {
+    "graphology": "^0.14.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jacomyma/graph-recipes-node-experiment.git"
+  },
+  "keywords": [
+    "graph",
+    "recipes",
+    "node"
+  ],
+  "author": "Mathieu Jacomy",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jacomyma/graph-recipes-node-experiment/issues"
+  },
+  "homepage": "https://github.com/jacomyma/graph-recipes-node-experiment#readme"
+}
