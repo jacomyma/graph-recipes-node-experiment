@@ -1,16 +1,18 @@
 const Graph = require('graphology');
 const jsdom = require("jsdom");
-const gexf = require('graphology-gexf/browser');
-// const fs = require('fs');
+const gexf = require('graphology-gexf');
+const fs = require('fs');
 
 // Read file
-/*var data;
+var gexf_string;
 try {
-    data = fs.readFileSync('test.gexf', 'utf8');
+    gexf_string = fs.readFileSync('test.gexf', 'utf8');
     console.log('GEXF file loaded');    
 } catch(e) {
     console.log('Error:', e.stack);
 }
-*/
-// Reading a string
-// var graph = gexf.parse(Graph, data);
+
+// Parse string
+var g = gexf.parse(Graph, gexf_string);
+console.log('GEXF parsed');
+
