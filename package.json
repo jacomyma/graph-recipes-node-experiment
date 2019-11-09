@@ -4,6 +4,8 @@
   "description": "An experiment to execute Graph Recipes scripts on a NodeJS infrastructure",
   "main": "experiment.js",
   "dependencies": {
+    "canvas": "^2.6.0",
+    "d3": "^5.12.0",
     "dom-parser": "^0.1.6",
     "fs": "0.0.1-security",
     "graphology": "^0.14.1",
