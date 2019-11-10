@@ -32,8 +32,8 @@ var settings = {}
 settings.save_at_the_end = true
 
 // Image size and resolution
-settings.width =  10000 // in pixels
-settings.height = 10000 // in pixels
+settings.width =  20000 // in pixels
+settings.height = 20000 // in pixels
 
 // Zoom:
 // You can zoon on a given point of the network
@@ -50,7 +50,7 @@ settings.zoom_point = {x:0.6, y:0.5} // range from 0 to 1
 settings.draw_background = true
 settings.draw_network_shape_fill = false
 settings.draw_network_shape_contour = false
-settings.draw_cluster_fills = false
+settings.draw_cluster_fills = true
 settings.draw_cluster_contours = false
 settings.draw_cluster_labels = false
 settings.draw_edges = true
@@ -81,7 +81,7 @@ settings.network_shape_contour_color = "#bb9178"
 // ...generic structure
 settings.cluster_all_modalities = false // By default, we only use modalities specified in "node_clusters"
 settings.cluster_spreading = 0.5 // Range: 0.01 to 0.99 // Balanced: 0.5 // Acts on size
-settings.cluster_smoothness = 5 // Range: 0 to 10 or more // Makes rounder clusters
+settings.cluster_smoothness = 3 // Range: 0 to 10 or more // Makes rounder clusters
 // ...cluster fills
 settings.cluster_fill_alpha = 0.3 // Opacity // Range from 0 to 1
 settings.cluster_fill_color_by_modality = true // if false, use default color below
@@ -118,12 +118,41 @@ settings.label_border_thickness = 1.2
 settings.node_clusters = {
   "attribute_id": "city",
   "modalities": {
+    "København": {
+      "label": "København",
+      "count": 7249,
+      "color": "#ac5b83"
+    },
+    "Copenhagen": {
+      "label": "Copenhagen",
+      "count": 6074,
+      "color": "#9a6838"
+    },
+    "Aarhus": {
+      "label": "Aarhus",
+      "count": 3767,
+      "color": "#67751b"
+    },
+    "Odense": {
+      "label": "Odense",
+      "count": 2553,
+      "color": "#b54c5e"
+    },
+    "Aalborg": {
+      "label": "Aalborg",
+      "count": 1210,
+      "color": "#336d34"
+    },
+    "Roskilde": {
+      "label": "Roskilde",
+      "count": 895,
+      "color": "#5f6f79"
+    }
   },
-  "default_color": "#5f6f79"
-}
+  "default_color": "#5f6f79"}
 
 // Advanced settings
-settings.adjust_voronoi_range = 200 // Factor // Larger node halo + slightly bigger clusters
+settings.adjust_voronoi_range = 150 // Factor // Larger node halo + slightly bigger clusters
 settings.max_voronoi_size = 1500 // Above that size, we approximate the voronoi
 
 /// (END OF SETTINGS)
