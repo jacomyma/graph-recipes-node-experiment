@@ -32,8 +32,11 @@ var settings = {}
 settings.save_at_the_end = true
 
 // Image size and resolution
-settings.width =  20000 // in pixels
-settings.height = 20000 // in pixels
+settings.width =  5000 // in pixels
+settings.height = 5000 // in pixels
+
+// Reference pen size (determines many line thicknesses)
+settings.pen_size = 0.1
 
 // Zoom:
 // You can zoon on a given point of the network
@@ -50,7 +53,7 @@ settings.zoom_point = {x:0.6, y:0.5} // range from 0 to 1
 settings.draw_background = true
 settings.draw_network_shape_fill = false
 settings.draw_network_shape_contour = false
-settings.draw_cluster_fills = true
+settings.draw_cluster_fills = false
 settings.draw_cluster_contours = false
 settings.draw_cluster_labels = false
 settings.draw_edges = true
@@ -97,7 +100,6 @@ settings.cluster_label_font_weight = 300
 settings.cluster_label_outline_thickness = 4 // in px based on 1MP 72dpi
 
 // Layer: Edges
-settings.edge_thickness = 0.2 // in px based on 1MP
 settings.edge_alpha = 1 // Opacity // Range from 0 to 1
 settings.edge_high_quality = true // Halo around nodes // Time-consuming
 
@@ -1058,7 +1060,7 @@ function drawEdgesLayer(ctx, voronoiData) {
   options.display_voronoi = false // for monitoring purpose
   options.display_edges = true // disable for monitoring purpose
   options.max_edge_count = Infinity // for monitoring only
-  options.edge_thickness = settings.edge_thickness*Math.min(settings.width, settings.height) / 1000
+  options.edge_thickness = settings.pen_size*Math.min(settings.width, settings.height) / 1000
   options.edge_alpha = settings.edge_alpha
   options.edge_color = "#275473"
   options.node_halo = settings.edge_high_quality
@@ -1220,7 +1222,7 @@ function drawEdgesLayer(ctx, voronoiData) {
         o = (Math.random()<=o) ? (1) : (0)
 
         // Recaliber for lighter line
-        o *= 0.3 + 0.2*Math.random()
+        // o *= 0.3 + 0.2*Math.random()
 
         if (lastx) {
           ctx.lineWidth = options.edge_thickness * (0.9 + 0.2*Math.random())
@@ -1252,7 +1254,7 @@ function drawNodesLayer(ctx, nodesBySize) {
 
   var options = {}
   options.node_stroke = true
-  options.node_stroke_width = 0.2 * Math.min(settings.width, settings.height)/1000
+  options.node_stroke_width = settings.pen_size * Math.min(settings.width, settings.height)/1000
 
   // Clear canvas
   ctx.clearRect(0, 0, settings.width, settings.height)
@@ -1328,10 +1330,11 @@ function drawNodeLabelsLayer(ctx, nodesBySize_) {
   options.sized_labels = true
   options.label_spacing_factor = 3 // 1=normal; 2=box twice as wide/high etc.
   options.label_spacing_offset = 2 * Math.min(settings.width, settings.height)/1000
-  options.font_family = 'Raleway, sans-serif'
+  options.font_family = 'Raleway'
   options.font_min_size = settings.label_font_min_size * Math.min(settings.width, settings.height)/1000
   options.font_max_size = settings.label_font_max_size * Math.min(settings.width, settings.height)/1000
-  options.font_thickness_optical_correction = 0.7
+  options.font_thickness_optical_correction = 0.9
+  options.font_target_thickness = settings.pen_size * Math.min(settings.width, settings.height)/1000
   options.border_thickness = settings.label_border_thickness * Math.min(settings.width, settings.height)/1000
   options.border_color = settings.background_color
   options.pixmap_size = 1 + Math.floor(0.3 * options.font_min_size)
@@ -1341,6 +1344,7 @@ function drawNodeLabelsLayer(ctx, nodesBySize_) {
   //  Relative thicknesses for: Raleway
   var weights =     [ 100, 200, 300, 400, 500, 600, 700, 800, 900 ]
   var thicknesses = [   2, 3.5,   5,   7, 9.5,  12,  15,  17,  21 ]
+  var thicknessRatio = 1.1 * options.font_target_thickness
   var thicknessToWeight = d3.scaleLinear()
     .domain(thicknesses)
     .range(weights)
@@ -1349,7 +1353,7 @@ function drawNodeLabelsLayer(ctx, nodesBySize_) {
   var normalizeFontSize = function(size) {
     // Theoretical apparent thickness (in pixels);
     // found by reference to the biggest size
-    var theoreticalApparentThickness = options.font_max_size * thicknesses[0]
+    var theoreticalApparentThickness = options.font_max_size * thicknesses[0] * thicknessRatio
     // But the apparent thickness is more natural if smaller sizes are
     // slightly thinner
     var sizeRatio = size / options.font_max_size
@@ -1428,7 +1432,7 @@ function drawNodeLabelsLayer(ctx, nodesBySize_) {
         var sw = normalizeFontSize(fontSize)
         fontSize = sw[0]
         var fontWeight = sw[1]
-        ctx.font = fontWeight + " " + fontSize + "px " + options.font_family
+        ctx.font = buildContextFontString(fontWeight, fontSize, options.font_family)
 
         // Then, draw the label only if wanted
         var labelCoordinates = {
@@ -1530,7 +1534,7 @@ function drawClusterLabelsLayer(ctx, modalities, centroidsByModality) {
   options.draw_label = true // idem
   options.font_size = settings.cluster_label_font_size * Math.min(settings.width, settings.height) / 1000
   options.font_weight = 300
-  options.font_family = "'Raleway', sans-serif"
+  options.font_family = "Raleway"
   options.border_thickness = 2*settings.cluster_label_outline_thickness * Math.min(settings.width, settings.height) / 1000
   options.border_color = function(c){return c.toString()}
   options.label_color = function(c){return "#FFF"}
@@ -2023,6 +2027,43 @@ function downloadImageData(imgd, name) {
   })
 }
 
+function buildContextFontString(fontWeight, fontSize, fontFamily) {
+	// Browser
+	// return fontWeight + " " + fontSize + "px " + fontFamily
+	// Node
+	var weightSuffix
+	fontWeight = +fontWeight
+	switch (fontWeight) {
+		case 100:
+			weightSuffix = " Thin"
+			break
+		case 200:
+			weightSuffix = " ExtraLight"
+			break
+		case 300:
+			weightSuffix = " Light"
+			break
+		case 400:
+			weightSuffix = ""
+			break
+		case 500:
+			weightSuffix = " Medium"
+			break
+		case 600:
+			weightSuffix = " SemiBold"
+			break
+		case 700:
+			return "bold " + fontSize + "px " + fontFamily
+			break
+		case 800:
+			weightSuffix = " ExtraBold"
+			break
+		case 900:
+			weightSuffix = " Black"
+			break
+	}
+	return fontSize + "px " + fontFamily + weightSuffix
+}
 
 //// LOG
 var logTime
