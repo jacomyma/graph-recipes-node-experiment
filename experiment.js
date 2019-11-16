@@ -7,7 +7,7 @@ const d3 = require('d3')
 // Read file
 var gexf_string;
 try {
-    gexf_string = fs.readFileSync('test.gexf', 'utf8');
+    gexf_string = fs.readFileSync('data/test.gexf', 'utf8');
     console.log('GEXF file loaded');    
 } catch(e) {
     console.log('Error:', e.stack);
@@ -34,9 +34,10 @@ settings.save_at_the_end = true
 // Image size and resolution
 settings.width =  5000 // in pixels
 settings.height = 5000 // in pixels
+settings.tile_factor = 2
 
 // Reference pen size (determines many line thicknesses)
-settings.pen_size = 0.1
+settings.pen_size = 0.2
 
 // Zoom:
 // You can zoon on a given point of the network
@@ -45,7 +46,7 @@ settings.pen_size = 0.1
 // By default, a slight unzoom gives a welcome space on the borders
 settings.zoom_enabled = true
 settings.zoom_window_size = 1.2 // range from 0 to 1 (dezooms if >1)
-settings.zoom_point = {x:0.6, y:0.5} // range from 0 to 1
+settings.zoom_point = {x:0.5, y:0.5} // range from 0 to 1
 
 // Layers:
 // Decide which layers are drawn.
@@ -63,7 +64,6 @@ settings.draw_node_labels = true
 // Layer: Background
 // Original Backscatter palette: "#D9D8DA"
 // Lighter for more contrast, a little warm: "#e0dcd9"
-settings.background_circle = false
 settings.background_color = "#e3d6c1"
 
 // Layer: Network shape
@@ -73,7 +73,7 @@ settings.network_shape_spreading = 0.9 // Range: 0.01 to 0.99 // Balanced: 0.5 /
 settings.network_shape_smoothness = 0 // Range: 0 to 10 or more // Makes rounder clusters
 // ...shape fill
 settings.network_shape_fill_alpha = 0.4 // Opacity // Range from 0 to 1
-settings.network_shape_fill_color = "#cdc7c3"
+settings.network_shape_fill_color = "#000"
 // ...shape contour
 settings.network_shape_contour_thickness = 1 // Min: 1
 settings.network_shape_contour_alpha = 0.8 // Opacity // Range from 0 to 1
@@ -154,7 +154,7 @@ settings.node_clusters = {
   "default_color": "#5f6f79"}
 
 // Advanced settings
-settings.adjust_voronoi_range = 150 // Factor // Larger node halo + slightly bigger clusters
+settings.adjust_voronoi_range = 25 // Factor // Larger node halo + slightly bigger clusters
 settings.max_voronoi_size = 1500 // Above that size, we approximate the voronoi
 
 /// (END OF SETTINGS)
@@ -163,24 +163,31 @@ settings.max_voronoi_size = 1500 // Above that size, we approximate the voronoi
 /// INIT
 report("Initialization")
 
-// Create the canvas where the image will be rendered
-var canvas = createCanvas(settings.width, settings.height)
-var ctx = canvas.getContext("2d")
-
 // Fix missing coordinates and/or colors:
 //  some parts of the script require default values
 //  that are sometimes missing. We add them for consistency.)
 addMissingVisualizationData()
 
-// Normalize coordinates:
-//  Most networks have arbitrary coordinates. Here we
-//  normalize them to limit side effects. In particular, we
-//  center the graph on its barycenter (center of gravity).
-rescaleGraphToGraphicSpace()
+// Create the canvas where the image will be rendered
+var canvas, ctx
 
-// Build image
-build()
+var xtile, ytile
+for (xtile=0; xtile<settings.tile_factor; xtile++) {
+	for (ytile=0; ytile<settings.tile_factor; ytile++) {
+		
+		canvas = createCanvas(settings.width, settings.height)
+		ctx = canvas.getContext("2d")
 
+		// Normalize coordinates:
+		//  Most networks have arbitrary coordinates. Here we
+		//  normalize them to limit side effects. In particular, we
+		//  center the graph on its barycenter (center of gravity).
+		rescaleGraphToGraphicSpace(true)
+
+		// Build image
+		build()
+	}
+}
 
 /// PROCESS
 
@@ -294,11 +301,14 @@ function build(){
   saveIfNeeded()
 
   // SAVE PNG
-  const out = fs.createWriteStream(__dirname + '/test.png')
+  var fname = 'test'
+  if (settings.tile_factor > 1) {
+  	fname = fname + ' ' + settings.width + 'x' + settings.height + ' ' + xtile + ',' + ytile
+  }
+  const out = fs.createWriteStream(__dirname + '/data/'+fname+'.png')
 	const stream = canvas.createPNGStream()
 	stream.pipe(out)
 	out.on('finish', () =>  console.log('The PNG file was created.'))
-
 }
 
 
@@ -352,7 +362,7 @@ function addMissingVisualizationData() {
   report("...done.")
 }
 
-function rescaleGraphToGraphicSpace() {
+function rescaleGraphToGraphicSpace(acknowledge_tiling) {
   log("Rescale graph to graphic space...")
 
   // General barycenter resize
@@ -392,7 +402,7 @@ function rescaleGraphToGraphicSpace() {
     n.size *= ratio
   })
 
-  // Additionnal zoom resize
+  // Additional zoom resize
   if (settings.zoom_enabled) {
     xbarycenter = settings.zoom_point.x * settings.width// - settings.width / 2
     ybarycenter = settings.zoom_point.y * settings.height// - settings.height / 2
@@ -405,6 +415,16 @@ function rescaleGraphToGraphicSpace() {
       n.size *= ratio
     })
   }
+
+  // Additional resize for tiling
+	if (acknowledge_tiling && settings.tile_factor > 1) {
+    g.nodes().forEach(function(nid, i){
+      var n = g.getNodeAttributes(nid)
+      n.x = settings.tile_factor * n.x - xtile * settings.width 
+      n.y = settings.tile_factor * n.y - ytile * settings.height
+      n.size *= settings.tile_factor
+    })
+  }  
   report("...done.")
 }
 
@@ -463,7 +483,7 @@ function precomputeVoronoi() {
     options.width = settings.width
     options.height = settings.height
   }
-  options.voronoi_range = settings.adjust_voronoi_range * options.width * options.height / Math.min(options.width,options.height) / g.order / settings.zoom_window_size
+  options.voronoi_range = settings.adjust_voronoi_range * Math.min(options.width,options.height) * settings.tile_factor / g.order / settings.zoom_window_size
   options.voronoi_use_node_size = false
 
   // Get an index of nodes where ids are integers
@@ -589,6 +609,7 @@ function precomputeNetworkShapeImprint(voronoiData) {
     }
   }
 
+  
   // Pre-treatment: Make the imprint of the voronoï more natural
   // Add a slight blur (but keep the original)
   imgd = mergeLayers([
@@ -769,17 +790,7 @@ function drawBackgroundLayer(ctx) {
   log("Draw background layer...")
   // Clear canvas
   ctx.clearRect(0, 0, settings.width, settings.height);
-  if (settings.background_circle) {
-    var r = Math.min(settings.width, settings.height)/2
-    ctx.beginPath()
-    ctx.arc(settings.width/2, settings.height/2, r, 0, 2 * Math.PI, false)
-    ctx.lineWidth = 0
-    ctx.fillStyle = settings.background_color
-    ctx.shadowColor = 'transparent'
-    ctx.fill()
-  } else {
-    paintAll(ctx, settings.width, settings.height, settings.background_color)
-  }
+  paintAll(ctx, settings.width, settings.height, settings.background_color)
   report("...done.")
   return ctx.getImageData(0, 0, settings.width, settings.height)
 }
@@ -1174,7 +1185,7 @@ function drawEdgesLayer(ctx, voronoiData) {
         // Build path
         var iPixStep = 2.5 //Math.max(1.5, 0.7*options.edge_thickness)
         var l = Math.ceil(d/iPixStep)
-        path = new Uint16Array(3*l)
+        path = new Int16Array(3*l)
         for (i=0; i<1; i+=iPixStep/d) {
           x = (1-i)*ns.x + i*nt.x
           y = (1-i)*ns.y + i*nt.y
@@ -1202,7 +1213,7 @@ function drawEdgesLayer(ctx, voronoiData) {
           }
         }
       } else {
-        path = new Uint16Array(6)
+        path = new Int16Array(6)
         path[0] = ns.x
         path[1] = ns.y
         path[2] = 255
@@ -1229,9 +1240,9 @@ function drawEdgesLayer(ctx, voronoiData) {
           color.opacity = (lasto+o)/2
           ctx.beginPath()
           ctx.strokeStyle = color.toString()
-          ctx.moveTo(lastx, lasty)
-          ctx.lineTo(x, y)
-          ctx.stroke()
+        	ctx.moveTo(lastx, lasty)
+        	ctx.lineTo(x, y)
+        	ctx.stroke()
           ctx.closePath()
         }
 
@@ -1334,7 +1345,7 @@ function drawNodeLabelsLayer(ctx, nodesBySize_) {
   options.font_min_size = settings.label_font_min_size * Math.min(settings.width, settings.height)/1000
   options.font_max_size = settings.label_font_max_size * Math.min(settings.width, settings.height)/1000
   options.font_thickness_optical_correction = 0.9
-  options.font_target_thickness = settings.pen_size * Math.min(settings.width, settings.height)/1000
+  options.text_thickness = settings.pen_size * Math.min(settings.width, settings.height)/1000
   options.border_thickness = settings.label_border_thickness * Math.min(settings.width, settings.height)/1000
   options.border_color = settings.background_color
   options.pixmap_size = 1 + Math.floor(0.3 * options.font_min_size)
@@ -1344,29 +1355,24 @@ function drawNodeLabelsLayer(ctx, nodesBySize_) {
   //  Relative thicknesses for: Raleway
   var weights =     [ 100, 200, 300, 400, 500, 600, 700, 800, 900 ]
   var thicknesses = [   2, 3.5,   5,   7, 9.5,  12,  15,  17,  21 ]
-  var thicknessRatio = 1.1 * options.font_target_thickness
+  var thicknessRatio = 120
   var thicknessToWeight = d3.scaleLinear()
     .domain(thicknesses)
     .range(weights)
 
   // We restrain the size to the proper steps of the scale
   var normalizeFontSize = function(size) {
-    // Theoretical apparent thickness (in pixels);
-    // found by reference to the biggest size
-    var theoreticalApparentThickness = options.font_max_size * thicknesses[0] * thicknessRatio
-    // But the apparent thickness is more natural if smaller sizes are
-    // slightly thinner
-    var sizeRatio = size / options.font_max_size
-    var theoreticalApparentThickness_corrected = theoreticalApparentThickness * (sizeRatio + (1-sizeRatio) * options.font_thickness_optical_correction)
-    // The font thickness depends on the size
-    var theoreticalFontThickness = theoreticalApparentThickness_corrected / size
-    // We can find the weight from the thickness
-    var theoreticalWeight = thicknessToWeight(theoreticalFontThickness)
-    // We need to round to actual weights
-    var actualWeight = Math.max(weights[0], Math.min(weights[weights.length-1], 100*Math.round(theoreticalWeight/100)))
+  	// The target thickness is the pen size, which is fixed: options.text_thickness
+  	// But to compute the weight, we must know the thickness for a standard size: 1
+  	var thicknessForFontSize1 = thicknessRatio * options.text_thickness / size
+  	var targetWeight = thicknessToWeight(thicknessForFontSize1)
+  	// console.log(size, thicknessForFontSize1, targetWeight)
+
+  	// We need to round to actual weights
+    var actualWeight = Math.max(weights[0], Math.min(weights[weights.length-1], 100*Math.round(targetWeight/100)))
 
     // We can also restrain the size to the actual weight
-    var restrainedSize = theoreticalApparentThickness_corrected / thicknessToWeight.invert(actualWeight)
+    var restrainedSize = thicknessRatio * options.text_thickness / thicknessToWeight.invert(actualWeight)
 
     return [restrainedSize, actualWeight]
   }
