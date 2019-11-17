@@ -7,7 +7,7 @@ const d3 = require('d3')
 // Read file
 var gexf_string;
 try {
-    gexf_string = fs.readFileSync('data/test.gexf', 'utf8');
+    gexf_string = fs.readFileSync('data/test_small.gexf', 'utf8');
     console.log('GEXF file loaded');    
 } catch(e) {
     console.log('Error:', e.stack);
@@ -59,7 +59,7 @@ settings.draw_cluster_contours = false
 settings.draw_cluster_labels = false
 settings.draw_edges = true
 settings.draw_nodes = true
-settings.draw_node_labels = true
+settings.draw_node_labels = false
 
 // Layer: Background
 // Original Backscatter palette: "#D9D8DA"
@@ -154,8 +154,8 @@ settings.node_clusters = {
   "default_color": "#5f6f79"}
 
 // Advanced settings
-settings.adjust_voronoi_range = 25 // Factor // Larger node halo + slightly bigger clusters
-settings.max_voronoi_size = 1500 // Above that size, we approximate the voronoi
+settings.adjust_voronoi_range = 5 // Factor // Larger node halo + slightly bigger clusters
+settings.max_voronoi_size = 100 // Above that size, we approximate the voronoi
 
 /// (END OF SETTINGS)
 
@@ -1068,8 +1068,8 @@ function drawClustersContourLayer(ctx, clusterImprints, modalities) {
 function drawEdgesLayer(ctx, voronoiData) {
   log("Draw edges...")
   var options = {}
-  options.display_voronoi = false // for monitoring purpose
-  options.display_edges = true // disable for monitoring purpose
+  options.display_voronoi = true // for monitoring purpose
+  options.display_edges = false // disable for monitoring purpose
   options.max_edge_count = Infinity // for monitoring only
   options.edge_thickness = settings.pen_size*Math.min(settings.width, settings.height) / 1000
   options.edge_alpha = settings.edge_alpha
@@ -1078,10 +1078,12 @@ function drawEdgesLayer(ctx, voronoiData) {
   options.jitter = 0.8
 
   var gradient = function(d){
-    return 0.5 + 0.5 * Math.cos(Math.PI - Math.pow(d, 2) * Math.PI)
+    return Math.round(10000*
+    	(0.5 + 0.5 * Math.cos(Math.PI - Math.pow(d, 2) * Math.PI))
+  	)/10000
   }
 
-  var dPixelMap_u, vidPixelMap_u
+  var dPixelMap_u, vidPixelMap_u // unpacked versions
   if (options.display_voronoi || options.node_halo) {
     // Unpack voronoi
     var ratio = Math.max(1, settings.width/settings.max_voronoi_size)
@@ -1148,14 +1150,13 @@ function drawEdgesLayer(ctx, voronoiData) {
   if (options.display_voronoi) {
     console.log("...Draw voronoi (for monitoring)...")
     var size = 1 // <- edit me (tradeoff memory / quality)
-    var x, y
     for (x=0; x<settings.width; x+=size) {
       for (y=0; y<settings.height; y+=size) {
         var pixi = Math.floor(x) + settings.width * Math.floor(y)
         var d = dPixelMap_u[pixi]/255
         var c = d3.color("#000")
         if (d < Infinity) {
-          c.opacity = gradient(dPixelMap_u[pixi]/255)
+        	c.opacity = gradient(d)
         }
         ctx.fillStyle = c.toString()
         ctx.fillRect(x, y, size, size)
@@ -1510,8 +1511,6 @@ function drawNodeLabelsLayer(ctx, nodesBySize_) {
       )
     })
 
-    paperify(ctx)
-    
     // Draw text
     labelsToDraw.forEach(function(l){
       ctx.font = l.font
@@ -1647,56 +1646,6 @@ function drawLayerOnTop(bottomLayer, topLayer) {
   ctx.drawImage(canvas2,0,0);
 
   return ctx.getImageData(0, 0, bottomLayer.width, bottomLayer.height)
-}
-
-function paperify(ctx) {
-  var imgd = ctx.getImageData(0, 0, settings.width, settings.height)
-
-  // Slight blur
-  imgd = convolute(imgd,
-  [ 1/9, 1/9, 1/9,
-    1/9, 1/9, 1/9,
-    1/9, 1/9, 1/9]
-  )
-
-  var pix = imgd.data
-  var i, pixlen
-  var passes = 1
-  while (passes-->0) {
-    // Noise alpha
-    for ( i = 0, pixlen = pix.length; i < pixlen; i += 4 ) {
-      if (pix[i+3] > 0) {
-        pix[i+3] = Math.floor((0.5 + 0.5*Math.random())*pix[i+3])
-      }
-    }
-
-    // Slight blur
-    imgd = convolute(imgd,
-    [ 1/9, 1/9, 1/9,
-      1/9, 1/9, 1/9,
-      1/9, 1/9, 1/9]
-    )
-  }
-
-  // Threshold
-  var pix = imgd.data
-  var i, pixlen
-  for ( i = 0, pixlen = pix.length; i < pixlen; i += 4 ) {
-    if (pix[i+3] > 128) {
-      pix[i+3] = 255
-    } else {
-      pix[i+3] = Math.floor(0.5*pix[i+3])
-    }
-  }
-
-  // Slighter blur
-  imgd = convolute(imgd,
-  [    0, 0.05,    0,
-    0.05,  0.8, 0.05,
-       0, 0.05,    0]
-  )
-
-  ctx.putImageData(imgd, 0, 0)
 }
 
 function mergeLayers(layers) {
