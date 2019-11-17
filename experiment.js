@@ -172,8 +172,8 @@ addMissingVisualizationData()
 var canvas, ctx
 
 var xtile, ytile
-for (xtile=0; xtile<settings.tile_factor; xtile++) {
-	for (ytile=0; ytile<settings.tile_factor; ytile++) {
+for (xtile=0; xtile<1/*settings.tile_factor*/; xtile++) {
+	for (ytile=0; ytile<1/*settings.tile_factor*/; ytile++) {
 		
 		canvas = createCanvas(settings.width, settings.height)
 		ctx = canvas.getContext("2d")
@@ -527,8 +527,8 @@ function precomputeVoronoi() {
     if (options.voronoi_use_node_size) {
       range *= n.size
     }
-    for (x = Math.max(0, Math.floor(nx - range) ); x <= Math.min(options.width, Math.floor(nx + range) ); x++ ){
-      for (y = Math.max(0, Math.floor(ny - range) ); y <= Math.min(options.height, Math.floor(ny + range) ); y++ ){
+    for (x = Math.max(0, Math.floor(nx - range) ); x <= Math.min(options.width-1, Math.floor(nx + range) ); x++ ){
+      for (y = Math.max(0, Math.floor(ny - range) ); y <= Math.min(options.height-1, Math.floor(ny + range) ); y++ ){
         d = Math.sqrt(Math.pow(nx - x, 2) + Math.pow(ny - y, 2))
  
         if (d < range) {
@@ -1117,7 +1117,8 @@ function drawEdgesLayer(ctx, voronoiData) {
       ip_bottom_left = xp1 + voronoiData.width * yp2
       ip_bottom_right = xp2 + voronoiData.width * yp2
       // Rescaling (gradual blending between the 4 pixels)
-      dPixelMap_u[i] =
+      dPixelMap_u[i] = voronoiData.dPixelMap[Math.floor(xp) + Math.floor(yp)*voronoiData.width]
+      /*dPixelMap_u[i] =
           (1-dx) * (
             (1-dy) * voronoiData.dPixelMap[ip_top_left]
             +  dy  * voronoiData.dPixelMap[ip_bottom_left]
@@ -1125,7 +1126,7 @@ function drawEdgesLayer(ctx, voronoiData) {
         + dx * (
             (1-dy) * voronoiData.dPixelMap[ip_top_right]
             +  dy  * voronoiData.dPixelMap[ip_bottom_right]
-          )
+          )*/
       // For vid we use only one (it's not a number but an id)
       if (dx<0.5) {
         if (dy<0.5) {
