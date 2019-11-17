@@ -155,7 +155,7 @@ settings.node_clusters = {
 
 // Advanced settings
 settings.adjust_voronoi_range = 5 // Factor // Larger node halo + slightly bigger clusters
-settings.max_voronoi_size = 100 // Above that size, we approximate the voronoi
+settings.max_voronoi_size = 500 // Above that size, we approximate the voronoi
 
 /// (END OF SETTINGS)
 
@@ -172,8 +172,10 @@ addMissingVisualizationData()
 var canvas, ctx
 
 var xtile, ytile
-for (xtile=0; xtile<1/*settings.tile_factor*/; xtile++) {
-	for (ytile=0; ytile<1/*settings.tile_factor*/; ytile++) {
+for (xtile=0; xtile<settings.tile_factor; xtile++) {
+	for (ytile=0; ytile<settings.tile_factor; ytile++) {
+// for (xtile=0; xtile<1; xtile++) {
+// 	for (ytile=0; ytile<1; ytile++) {
 		
 		canvas = createCanvas(settings.width, settings.height)
 		ctx = canvas.getContext("2d")
@@ -501,18 +503,18 @@ function precomputeVoronoi() {
   // Init a pixel map of integers for voronoi ids
   var vidPixelMap
   if (g.order < 255) {
-    vidPixelMap = new Uint8Array(options.width * options.height)
+    vidPixelMap = new Uint8Array((options.width+1) * (options.height+1))
   } else if (g.order < 65535) {
-    vidPixelMap = new Uint16Array(options.width * options.height)
+    vidPixelMap = new Uint16Array((options.width+1) * (options.height+1))
   } else {
-    vidPixelMap = new Uint32Array(options.width * options.height)
+    vidPixelMap = new Uint32Array((options.width+1) * (options.height+1))
   }
   for (i in vidPixelMap) {
     vidPixelMap[i] = 0
   }
 
   // Init a pixel map of floats for distances
-  var dPixelMap = new Uint8Array(options.width * options.height)
+  var dPixelMap = new Uint8Array((options.width+1) * (options.height+1))
   for (i in dPixelMap) {
     dPixelMap[i] = 255
   }
@@ -527,8 +529,8 @@ function precomputeVoronoi() {
     if (options.voronoi_use_node_size) {
       range *= n.size
     }
-    for (x = Math.max(0, Math.floor(nx - range) ); x <= Math.min(options.width-1, Math.floor(nx + range) ); x++ ){
-      for (y = Math.max(0, Math.floor(ny - range) ); y <= Math.min(options.height-1, Math.floor(ny + range) ); y++ ){
+    for (x = Math.max(0, Math.floor(nx - range) ); x <= Math.min(options.width, Math.floor(nx + range) ); x++ ){
+      for (y = Math.max(0, Math.floor(ny - range) ); y <= Math.min(options.height, Math.floor(ny + range) ); y++ ){
         d = Math.sqrt(Math.pow(nx - x, 2) + Math.pow(ny - y, 2))
  
         if (d < range) {
@@ -540,7 +542,7 @@ function precomputeVoronoi() {
             // In the halo range
             dmod = (d - nsize) / options.voronoi_range
           }
-          i = x + options.width * y
+          i = x + (options.width+1) * y
           var existingVid = vidPixelMap[i]
           if (existingVid == 0) {
             // 0 means there is no closest node
@@ -1068,8 +1070,8 @@ function drawClustersContourLayer(ctx, clusterImprints, modalities) {
 function drawEdgesLayer(ctx, voronoiData) {
   log("Draw edges...")
   var options = {}
-  options.display_voronoi = true // for monitoring purpose
-  options.display_edges = false // disable for monitoring purpose
+  options.display_voronoi = false // for monitoring purpose
+  options.display_edges = true // disable for monitoring purpose
   options.max_edge_count = Infinity // for monitoring only
   options.edge_thickness = settings.pen_size*Math.min(settings.width, settings.height) / 1000
   options.edge_alpha = settings.edge_alpha
@@ -1104,21 +1106,20 @@ function drawEdgesLayer(ctx, voronoiData) {
       yu = (i-xu)/settings.width
       // packed coordinates
       xp = xu/ratio
-      xp1 = Math.max(0, Math.min(voronoiData.width-1, Math.floor(xp)))
-      xp2 = Math.max(0, Math.min(voronoiData.width-1, Math.ceil(xp)))
+      xp1 = Math.max(0, Math.min(voronoiData.width, Math.floor(xp)))
+      xp2 = Math.max(0, Math.min(voronoiData.width, Math.ceil(xp)))
       dx = (xp-xp1)/(xp2-xp1) || 0
       yp = yu/ratio
-      yp1 = Math.max(0, Math.min(voronoiData.height-1, Math.floor(yp)))
-      yp2 = Math.max(0, Math.min(voronoiData.height-1, Math.ceil(yp)))
+      yp1 = Math.max(0, Math.min(voronoiData.height, Math.floor(yp)))
+      yp2 = Math.max(0, Math.min(voronoiData.height, Math.ceil(yp)))
       dy = (yp-yp1)/(yp2-yp1) || 0
       // coordinates of the 4 pixels necessary to rescale
-      ip_top_left = xp1 + voronoiData.width * yp1
-      ip_top_right = xp2 + voronoiData.width * yp1
-      ip_bottom_left = xp1 + voronoiData.width * yp2
-      ip_bottom_right = xp2 + voronoiData.width * yp2
+      ip_top_left = xp1 + (voronoiData.width+1) * yp1
+      ip_top_right = xp2 + (voronoiData.width+1) * yp1
+      ip_bottom_left = xp1 + (voronoiData.width+1) * yp2
+      ip_bottom_right = xp2 + (voronoiData.width+1) * yp2
       // Rescaling (gradual blending between the 4 pixels)
-      dPixelMap_u[i] = voronoiData.dPixelMap[Math.floor(xp) + Math.floor(yp)*voronoiData.width]
-      /*dPixelMap_u[i] =
+      dPixelMap_u[i] =
           (1-dx) * (
             (1-dy) * voronoiData.dPixelMap[ip_top_left]
             +  dy  * voronoiData.dPixelMap[ip_bottom_left]
@@ -1126,7 +1127,7 @@ function drawEdgesLayer(ctx, voronoiData) {
         + dx * (
             (1-dy) * voronoiData.dPixelMap[ip_top_right]
             +  dy  * voronoiData.dPixelMap[ip_bottom_right]
-          )*/
+          )
       // For vid we use only one (it's not a number but an id)
       if (dx<0.5) {
         if (dy<0.5) {
