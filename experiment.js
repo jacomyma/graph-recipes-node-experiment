@@ -1174,86 +1174,102 @@ function drawEdgesLayer(ctx, voronoiData) {
     g.edges()
       .filter(function(eid, i_){ return i_ < options.max_edge_count })
       .forEach(function(eid, i_){
-      if ((i_+1)%10000 == 0) {
-        console.log("..."+(i_+1)/1000+"K edges drawn...")
-      }
-      var ns = g.getNodeAttributes(g.source(eid))
-      var nt = g.getNodeAttributes(g.target(eid))
-      var color = d3.color(options.edge_color)
-      var path, i, x, y, o, pixi, pi=0
+	      if ((i_+1)%10000 == 0) {
+	        console.log("..."+(i_+1)/1000+"K edges drawn...")
+	      }
+	      var ns = g.getNodeAttributes(g.source(eid))
+	      var nt = g.getNodeAttributes(g.target(eid))
+	      var color = d3.color(options.edge_color)
+	      var path, i, x, y, o, dpixi, lastdpixi, lasto, pixi, pi=0
 
-      if (options.node_halo) {
-        var d = Math.sqrt(Math.pow(ns.x - nt.x, 2) + Math.pow(ns.y - nt.y, 2))
+	      if (options.node_halo) {
+	        var d = Math.sqrt(Math.pow(ns.x - nt.x, 2) + Math.pow(ns.y - nt.y, 2))
 
-        // Build path
-        var iPixStep = 2.5 //Math.max(1.5, 0.7*options.edge_thickness)
-        var l = Math.ceil(d/iPixStep)
-        path = new Int16Array(3*l)
-        for (i=0; i<1; i+=iPixStep/d) {
-          x = (1-i)*ns.x + i*nt.x
-          y = (1-i)*ns.y + i*nt.y
+	        // Build path
+	        var iPixStep = 2.5 //Math.max(1.5, 0.7*options.edge_thickness)
+	        var l = Math.ceil(d/iPixStep)
+	        path = new Int16Array(3*l)
+	        for (i=0; i<1; i+=iPixStep/d) {
+	          x = (1-i)*ns.x + i*nt.x
+	          y = (1-i)*ns.y + i*nt.y
 
-          // Opacity
-          pixi = Math.floor(x) + settings.width * Math.floor(y)
-          if (vidPixelMap_u[pixi] == ns.vid || vidPixelMap_u[pixi] == nt.vid) {
-            o = 1
-          } else {
-            o = gradient(dPixelMap_u[pixi]/255)
-          }
-          path[pi  ] = x
-          path[pi+1] = y
-          path[pi+2] = Math.round(o*255)
-          pi +=3
-        }
-        path[3*(l-1)  ] = nt.x
-        path[3*(l-1)+1] = nt.y
-        path[3*(l-1)+2] = 255
+	          // Opacity
+	          pixi = Math.floor(x) + settings.width * Math.floor(y)
+	          dpixi = dPixelMap_u[pixi]
+	          if (dpixi === undefined) {
+	          	if (lastdpixi !== undefined) {
+	          		o = lasto
+	          	} else {
+		          	o = 0
+	          	}
+	          } else {
+		          if (vidPixelMap_u[pixi] == ns.vid || vidPixelMap_u[pixi] == nt.vid) {
+		            o = 1
+		          } else {
+		            o = gradient(dpixi/255)
+		          }
+	          	if (lastdpixi === undefined && pi>3) {
+	          		path[(pi-3)+2] = Math.round(o*255)
+	          	} 
+	          }
+	          lastdpixi = dpixi
+	          lasto = o
 
-        // Smoothe path
-        if (path.length > 5) {
-          for (i=2; i<path.length-2; i++) {
-            path[i*3+2] = 0.15 * path[(i-2)*3+2] + 0.25 * path[(i-1)*3+2] + 0.2 * path[i*3+2] + 0.25 * path[(i+1)*3+2] + 0.15 * path[(i+2)*3+2]
-          }
-        }
-      } else {
-        path = new Int16Array(6)
-        path[0] = ns.x
-        path[1] = ns.y
-        path[2] = 255
-        path[3] = nt.x
-        path[4] = nt.y
-        path[5] = 255
-      }
-      
-      // Draw path
-      var x, y, o, lastx, lasty, lasto
-      for (i=0; i<path.length; i+=3) {
-        x = path[i] + options.jitter * (0.5 - Math.random())
-        y = path[i+1] + options.jitter * (0.5 - Math.random())
-        o = path[i+2]/255
-        
-        // Collapse opacity
-        o = (Math.random()<=o) ? (1) : (0)
+	          path[pi  ] = x
+	          path[pi+1] = y
+	          path[pi+2] = Math.round(o*255)
+	          pi +=3
+	          lasto = o
+	        }
+	        path[3*(l-1)  ] = nt.x
+	        path[3*(l-1)+1] = nt.y
+	        path[3*(l-1)+2] = 255
 
-        // Recaliber for lighter line
-        // o *= 0.3 + 0.2*Math.random()
+	        // Smoothe path
+	        if (path.length > 5) {
+	          for (i=2; i<path.length-2; i++) {
+	            path[i*3+2] = 0.15 * path[(i-2)*3+2] + 0.25 * path[(i-1)*3+2] + 0.2 * path[i*3+2] + 0.25 * path[(i+1)*3+2] + 0.15 * path[(i+2)*3+2]
+	          }
+	        }
+	      } else {
+	        path = new Int16Array(6)
+	        path[0] = ns.x
+	        path[1] = ns.y
+	        path[2] = 255
+	        path[3] = nt.x
+	        path[4] = nt.y
+	        path[5] = 255
+	      }
+	      
+	      // Draw path
+	      var x, y, o, lastx, lasty, lasto
+	      for (i=0; i<path.length; i+=3) {
+	        x = path[i] + options.jitter * (0.5 - Math.random())
+	        y = path[i+1] + options.jitter * (0.5 - Math.random())
+	        o = path[i+2]/255
+	        
+	        // Collapse opacity
+	        o = (Math.random()<=o) ? (1) : (0)
 
-        if (lastx) {
-          ctx.lineWidth = options.edge_thickness * (0.9 + 0.2*Math.random())
-          color.opacity = (lasto+o)/2
-          ctx.beginPath()
-          ctx.strokeStyle = color.toString()
-        	ctx.moveTo(lastx, lasty)
-        	ctx.lineTo(x, y)
-        	ctx.stroke()
-          ctx.closePath()
-        }
+	        // Recaliber for lighter line
+	        // o *= 0.3 + 0.2*Math.random()
 
-        lastx = x
-        lasty = y
-        lasto = o
-      }
-    })
+	        if (lastx) {
+	          ctx.lineWidth = options.edge_thickness * (0.9 + 0.2*Math.random())
+	          color.opacity = (lasto+o)/2
+	          ctx.beginPath()
+	          ctx.strokeStyle = color.toString()
+	        	ctx.moveTo(lastx, lasty)
+	        	ctx.lineTo(x, y)
+	        	ctx.stroke()
+	          ctx.closePath()
+	        }
+
+	        lastx = x
+	        lasty = y
+	        lasto = o
+	      }
+	    })
   }
 
   report("...done.")
