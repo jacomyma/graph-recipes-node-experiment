@@ -4,6 +4,7 @@ const gexf = require('graphology-gexf');
 const fs = require('fs');
 const { createCanvas, loadImage } = require('canvas')
 const d3 = require('d3')
+
 // Read file
 var gexf_string;
 try {
@@ -34,7 +35,7 @@ settings.save_at_the_end = true
 // Image size and resolution
 settings.width =  5000 // in pixels
 settings.height = 5000 // in pixels
-settings.tile_factor = 1 // Integer, default 1. Number of rows and columns of the grid of exported images.
+settings.tile_factor = 2 // Integer, default 1. Number of rows and columns of the grid of exported images.
 
 // Reference pen size (determines many line thicknesses)
 settings.pen_size = 0.5
@@ -57,9 +58,9 @@ settings.draw_network_shape_contour = false
 settings.draw_cluster_fills = false
 settings.draw_cluster_contours = false
 settings.draw_cluster_labels = false
-settings.draw_edges = false
+settings.draw_edges = true
 settings.draw_nodes = true
-settings.draw_node_labels = false
+settings.draw_node_labels = true
 
 // Layer: Background
 // Original Backscatter palette: "#D9D8DA"
@@ -69,12 +70,12 @@ settings.background_color = "#e3d6c1"
 // Layer: Network shape
 //        (a potato for the whole network)
 // ...generic structure
-settings.network_shape_size = 2 // Range: more than 0, default to 1.
+settings.network_shape_size = 3 // Range: more than 0, default to 1.
 settings.network_shape_swelling = 0.9 // Range: 0.01 to 0.99 // Balanced: 0.5 // Acts on size
-settings.network_shape_smoothness = 0 // Range: 0 to 10 or more // Makes rounder clusters
+settings.network_shape_smoothness = 15 // Range: more than 0 to 10 or more // Makes rounder clusters
 // ...shape fill
 settings.network_shape_fill_alpha = 0.4 // Opacity // Range from 0 to 1
-settings.network_shape_fill_color = "#000"
+settings.network_shape_fill_color = "#FFF"
 // ...shape contour
 settings.network_shape_contour_thickness = 1 // Min: 1
 settings.network_shape_contour_alpha = 0.8 // Opacity // Range from 0 to 1
@@ -156,7 +157,7 @@ settings.node_clusters = {
 
 // Advanced settings
 settings.adjust_voronoi_range = 5 // Factor // Larger node halo + slightly bigger clusters
-settings.max_precomputations_size = 500 // Above that size, we approximate the voronoi
+settings.max_precomputations_size = 1000 // Above that size, we approximate the voronoi
 
 /// (END OF SETTINGS)
 
@@ -584,8 +585,8 @@ function precomputeNetworkShapeImprint() {
   var options = {}
   // Steps
   options.step_blur = true
-  options.step_contrast = true
-  options.step_contrast_adjust_spread = true
+  options.step_save_blurred_canvas = false // For monitoring
+  options.step_save_contour = false // For monitoring
 
   if (settings.width>settings.max_precomputations_size) {
     options.ratio = settings.max_precomputations_size/settings.width
@@ -597,12 +598,9 @@ function precomputeNetworkShapeImprint() {
     options.height = settings.height
   }
   
-  // options.contrast_steepness = Infinity // More = more abrupt contour. ex: 0.03 for a slight gradient
-  // options.contrast_threshold = 0.15 // At which alpha level it "finds" the cluster (must remain low)
-  // options.contrast_postprocessing_blur_radius = 0.03 * Math.min(options.width, options.height) / settings.zoom_window_size
-  options.node_size_margin = 2 * Math.min(options.width, options.height) / 1000 / settings.zoom_window_size
+  options.node_size_margin = 15 * Math.min(options.width, options.height) / 1000 / settings.zoom_window_size
   options.node_size_factor = settings.network_shape_size // above 0, default 1
-  options.blur_radius = 0.01 * settings.network_shape_smoothness * Math.min(options.width, options.height) / settings.zoom_window_size
+  options.blur_radius = settings.network_shape_smoothness * Math.min(options.width, options.height) / 1000 / settings.zoom_window_size
   options.gradient_threshold = 1-settings.network_shape_swelling // Idem on a secondary pass
 
   // New Canvas
@@ -625,57 +623,62 @@ function precomputeNetworkShapeImprint() {
     ctx.fill()
   })
 
-  // SAVE PNG
-  var fname = 'network shape'
-  const out = fs.createWriteStream(__dirname + '/data/'+fname+'.png')
-	const stream = newCanvas.createPNGStream()
-	stream.pipe(out)
-	out.on('finish', () =>  console.log('The PNG file was created.'))
-  
-	return
-
-
-  // Pre-treatment: Make the imprint of the voronoï more natural
-  // Add a slight blur (but keep the original)
-  imgd = mergeLayers([
-    imgd,
-    blur(imgd, 0.005 * Math.min(voronoiData.width, voronoiData.height) / settings.zoom_window_size)
-  ])
-  // Convolute: slight blur for antialiasing
-  imgd = convolute(imgd,
-  [  0, .1,  0,
-    .1, .6, .1,
-     0, .1,  0 ]
-  )
+  var imgd = ctx.getImageData(0, 0, options.width, options.height)
 
   // Blur
   if (options.step_blur) {
     // Blur
-    imgd = blur(imgd, options.blur_radius)
+    imgd = blur(imgd, options.blur_radius, ctx)
 
-    // Normalize alpha at 10% (helps with edge cases where alpha becomes very low)
-    imgd = normalizeAlpha(imgd, 0, 255, 0.1)
+    // Normalize alpha at 80% (80% normalised & 20% original)
+    imgd = normalizeAlpha(imgd, 0, 255, 0.8, ctx)
+
+    // data to canvas
+  	ctx.putImageData( imgd, 0, 0 )
   }
 
-  // Threshold the "cloud"
-  if (options.step_contrast) {
-    imgd = alphacontrast(imgd, 0, options.contrast_threshold, options.contrast_steepness)
-  }
+  // SAVE PNG
+  if (options.step_save_blurred_canvas) {
+	  var fname = 'network shape monitoring'
+	  const out = fs.createWriteStream(__dirname + '/data/'+fname+'.png')
+		const stream = newCanvas.createPNGStream()
+		stream.pipe(out)
+		out.on('finish', () =>  console.log('The PNG file for shape contour monitoring was created.'))
+	}
 
-  // Postprocessing: blur then re-threshold
-  if (options.step_contrast_adjust_spread) {
-    // Blur
-    imgd = blur(imgd, options.contrast_postprocessing_blur_radius)
+  // SAVE PNG
+  if (options.step_save_blurred_canvas) {
+  	ctx.putImageData( imgd, 0, 0 )
+	  var fname = 'network shape monitoring'
+	  const out = fs.createWriteStream(__dirname + '/data/'+fname+'.png')
+		const stream = newCanvas.createPNGStream()
+		stream.pipe(out)
+		out.on('finish', () =>  console.log('The PNG file for shape contour monitoring was created.'))
+	}
 
-    // Normalize alpha at 50% (helps with edge cases where alpha becomes very low)
-    imgd = normalizeAlpha(imgd, 0, 255, 0.5)
+	// Find contour
+	var values = imgd.data.filter(function(d,i){ return i%4==3 })
+	var contour = d3.contours()
+    .size([options.width, options.height])
+    .thresholds(d3.range(0, 255))
+    .contour(values, Math.round(255*options.gradient_threshold));
 
-    // Threshold
-    imgd = alphacontrast(imgd, 0, options.contrast_postprocessing_threshold, options.contrast_steepness)
-  }
+  // SAVE PNG
+  if (options.step_save_contour) {
+  	const path = d3.geoPath(null, ctx)
+  	ctx.beginPath()
+    path(contour)
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)'
+    ctx.fill()
 
-  report("...done.")
-  return imgd
+    var fname = 'network shape contour monitoring'
+	  const out = fs.createWriteStream(__dirname + '/data/'+fname+'.png')
+		const stream = newCanvas.createPNGStream()
+		stream.pipe(out)
+		out.on('finish', () =>  console.log('The PNG file for shape contour monitoring was created.'))
+	}
+  
+	return {ratio:options.ratio, contour:contour}
 }
 
 function precomputeClusterImprints(modalities, voronoiData, attId) {
@@ -836,47 +839,21 @@ function drawNetworkShapeFillLayer(ctx, networkShapeImprint) {
   // Clear canvas
   ctx.clearRect(0, 0, settings.width, settings.height);
   
-  // FIXME: remove the line below
+  var color = d3.color(settings.network_shape_fill_color)
+  color.opacity = settings.network_shape_fill_alpha
+
+	const path = d3.geoPath(null, ctx)
+	ctx.translate(-xtile*settings.width, -ytile*settings.height)
+	ctx.scale(settings.tile_factor/networkShapeImprint.ratio, settings.tile_factor/networkShapeImprint.ratio)
+	ctx.beginPath()
+  path(networkShapeImprint.contour)
+  ctx.fillStyle = color.toString()
+  ctx.fill()
+
+	// Reset current transformation matrix to the identity matrix
+	ctx.setTransform(1, 0, 0, 1, 0, 0);
+
   return ctx.getImageData(0, 0, settings.width, settings.height)
-
-  // Draw and rescale the imprint if necessary
-  var imgd
-  var ratio = settings.width/settings.max_precomputations_size
-  if (ratio>1) {
-    var canvas2=createCanvas()
-    canvas2.width=settings.width
-    canvas2.height=settings.height
-    var ctx2=canvas2.getContext("2d")
-    ctx2.putImageData(networkShapeImprint, 0, 0)
-    ctx.scale(ratio, ratio)
-    ctx.drawImage(ctx2.canvas,0,0)
-    imgd = ctx.getImageData(0, 0, settings.width, settings.height)
-    ctx.setTransform(1, 0, 0, 1, 0, 0)
-    imgd = processRescaledImprint(imgd)
-  } else {
-    imgd = networkShapeImprint
-  }
-
-  var color = settings.network_shape_fill_color
-  var pix = imgd.data
-  var rgb = d3.color(color)
-  var i, pixlen
-  for ( i = 0, pixlen = pix.length; i < pixlen; i += 4 ) {
-    pix[i  ] = rgb.r // red
-    pix[i+1] = rgb.g // green
-    pix[i+2] = rgb.b // blue
-    pix[i+3] = Math.floor(settings.network_shape_fill_alpha * pix[i+3]) // alpha
-  }
-
-  // Convolute: slight blur (for antialiasing)
-  imgd = convolute(imgd,
-  [  0, .1,  0,
-    .1, .6, .1,
-     0, .1,  0 ]
-  )
-
-  report("...done.")
-  return imgd
 }
 
 function drawNetworkShapeContourLayer(ctx, networkShapeImprint) {
@@ -1820,12 +1797,13 @@ function findCentroid(imgd, modality) {
   return [x, y]
 }
 
-function normalizeAlpha(imgd, minalpha, maxalpha, dryWet) {
+function normalizeAlpha(imgd, minalpha, maxalpha, dryWet, _ctx) {
+	if (_ctx === undefined) { _ctx = ctx }
   var w = imgd.width
   var h = imgd.height
   var pix = imgd.data
   // output
-  var imgdo = ctx.createImageData(w,h)
+  var imgdo = _ctx.createImageData(w,h)
   var pixo = imgdo.data
 
   var min = Infinity
@@ -1891,14 +1869,15 @@ function buildConstrastFunction(factor, threshold255, minalpha) {
   return contrast
 }
 
-function blur(imgd, r) {
+function blur(imgd, r, _ctx) {
+	if (_ctx === undefined) { _ctx = ctx }
   var i
   var w = imgd.width
   var h = imgd.height
   var pix = imgd.data
   var pixlen = pix.length
   // output
-  var imgdo = ctx.createImageData(w,h)
+  var imgdo = _ctx.createImageData(w,h)
   var pixo = imgdo.data
 
   // Split channels
