@@ -8,7 +8,7 @@ const d3 = require('d3')
 // Read file
 var gexf_string;
 try {
-    gexf_string = fs.readFileSync('data/test_small.gexf', 'utf8');
+    gexf_string = fs.readFileSync('data/test.gexf', 'utf8');
     console.log('GEXF file loaded');    
 } catch(e) {
     console.log('Error:', e.stack);
@@ -38,7 +38,7 @@ settings.height = 5000 // in pixels
 settings.tile_factor = 2 // Integer, default 1. Number of rows and columns of the grid of exported images.
 
 // Reference pen size (determines many line thicknesses)
-settings.pen_size = 0.5
+settings.pen_size = 0.2
 
 // Zoom:
 // You can zoon on a given point of the network
@@ -55,10 +55,9 @@ settings.zoom_point = {x:0.5, y:0.5} // range from 0 to 1
 settings.draw_background = true
 settings.draw_network_shape_fill = false
 settings.draw_network_shape_contour = true
-settings.draw_cluster_fills = false
+settings.draw_cluster_fills = true
 settings.draw_cluster_contours = false
-settings.draw_cluster_labels = false
-settings.draw_edges = false
+settings.draw_edges = true
 settings.draw_nodes = true
 settings.draw_node_labels = true
 
@@ -75,7 +74,7 @@ settings.network_shape_swelling = 0.9 // Range: 0.01 to 0.99 // Balanced: 0.5 //
 settings.network_shape_smoothness = 15 // Range: more than 0 to 10 or more // Makes rounder clusters
 // ...shape fill
 settings.network_shape_fill_alpha = 0.4 // Opacity // Range from 0 to 1
-settings.network_shape_fill_color = "#FFF"
+settings.network_shape_fill_color = "#eee"
 // ...shape contour
 settings.network_shape_contour_thickness = 1 // Min: 1
 settings.network_shape_contour_alpha = 0.8 // Opacity // Range from 0 to 1
@@ -85,21 +84,18 @@ settings.network_shape_contour_color = "#bb9178"
 //        (a potato per modality of tqrget attribute)
 // ...generic structure
 settings.cluster_all_modalities = false // By default, we only use modalities specified in "node_clusters"
-settings.cluster_spreading = 0.5 // Range: 0.01 to 0.99 // Balanced: 0.5 // Acts on size
-settings.cluster_smoothness = 3 // Range: 0 to 10 or more // Makes rounder clusters
+settings.cluster_shape_size = 2 // Range: more than 0, default to 1.
+settings.cluster_shape_swelling = 0.6 // Range: 0.01 to 0.99 // Balanced: 0.5 // Acts on size
+settings.cluster_shape_smoothness = 30// Range: more than 0 to 10 or more // Makes rounder clusters
 // ...cluster fills
 settings.cluster_fill_alpha = 0.3 // Opacity // Range from 0 to 1
 settings.cluster_fill_color_by_modality = true // if false, use default color below
 settings.cluster_fill_color_default = "#8B8B8B"
 // ...cluster contours
-settings.cluster_contour_thickness = 3 // Range: 0 to 10 or more
+settings.cluster_contour_thickness = settings.pen_size // Range: 0 to 10 or more
 settings.cluster_contour_alpha = 1 // Opacity // Range from 0 to 1
 settings.cluster_contour_color_by_modality = true // if false, use default color below
 settings.cluster_contour_color_default = "#8B8B8B"
-// ...cluster labels
-settings.cluster_label_font_size = 20 // in pt based on 1MP 72dpi
-settings.cluster_label_font_weight = 300
-settings.cluster_label_outline_thickness = 4 // in px based on 1MP 72dpi
 
 // Layer: Edges
 settings.edge_alpha = 1 // Opacity // Range from 0 to 1
@@ -135,7 +131,7 @@ settings.node_clusters = {
     "Aarhus": {
       "label": "Aarhus",
       "count": 3767,
-      "color": "#67751b"
+      "color": "#7c8f12"
     },
     "Odense": {
       "label": "Odense",
@@ -145,19 +141,19 @@ settings.node_clusters = {
     "Aalborg": {
       "label": "Aalborg",
       "count": 1210,
-      "color": "#336d34"
+      "color": "#3d803e"
     },
     "Roskilde": {
       "label": "Roskilde",
       "count": 895,
-      "color": "#5f6f79"
+      "color": "#40588e"
     }
   },
   "default_color": "#5f6f79"}
 
 // Advanced settings
-settings.adjust_voronoi_range = 5 // Factor // Larger node halo + slightly bigger clusters
-settings.max_precomputations_size = 1000 // Above that size, we approximate the voronoi
+settings.adjust_voronoi_range = 250 // Factor // Larger node halo + slightly bigger clusters
+settings.max_precomputations_size = 2500 // Above that size, we approximate the voronoi
 
 /// (END OF SETTINGS)
 
@@ -205,6 +201,18 @@ function precomputePreTiling() {
   ) {
     precomputedPreTiling.networkShapeImprint = precomputeNetworkShapeImprint()
   }
+  if ( settings.draw_cluster_fills
+    || settings.draw_cluster_contours
+    || settings.draw_cluster_labels
+  ) {
+    if (settings.cluster_all_modalities) {
+      precomputedPreTiling.modalities = precomputeModalities()
+    } else {
+      precomputedPreTiling.modalities = d3.keys(settings.node_clusters.modalities)
+    }
+    precomputedPreTiling.clusterImprints = precomputeClusterImprints(precomputedPreTiling.modalities, settings.node_clusters.attribute_id)
+  }
+
 	return precomputedPreTiling
 }
 
@@ -215,23 +223,8 @@ function build(precomputedPreTiling) {
   if (settings.draw_nodes || settings.draw_node_labels) {
     nodesBySize = precomputeNodesBySize()
   }
-  if ( settings.draw_cluster_fills
-    || settings.draw_cluster_contours
-    || settings.draw_cluster_labels
-    || (settings.draw_edges && settings.edge_high_quality)
-  ) {
-      voronoiData = precomputeVoronoi()
-  }
-  if ( settings.draw_cluster_fills
-    || settings.draw_cluster_contours
-    || settings.draw_cluster_labels
-  ) {
-    if (settings.cluster_all_modalities) {
-      modalities = precomputeModalities()
-    } else {
-      modalities = d3.keys(settings.node_clusters.modalities)
-    }
-    clusterImprints = precomputeClusterImprints(modalities, voronoiData, settings.node_clusters.attribute_id)
+  if ( settings.draw_edges && settings.edge_high_quality ) {
+  	voronoiData = precomputeVoronoi()
   }
   if (settings.draw_cluster_labels) {
     centroidsByModality = precomputeCentroids(ctx, modalities, clusterImprints)
@@ -281,7 +274,7 @@ function build(precomputedPreTiling) {
   // Draw cluster contours
   if (settings.draw_cluster_contours) {
     layeredImage = drawLayerOnTop(layeredImage,
-      drawClustersContourLayer(ctx, clusterImprints, modalities)
+      drawClustersContourLayer(ctx, precomputedPreTiling.clusterImprints, precomputedPreTiling.modalities)
     )
   }
 
@@ -290,18 +283,11 @@ function build(precomputedPreTiling) {
     layeredImage = drawLayerOnTop(layeredImage,
       drawNodeLabelsLayer(ctx, nodesBySize)
     )
-  }  
-
-  // Draw cluster labels
-  if (settings.draw_cluster_labels) {
-    layeredImage = drawLayerOnTop(layeredImage,
-      drawClusterLabelsLayer(ctx, modalities, centroidsByModality)
-    )
   }
 
   // Draw cluster fills
   if (settings.draw_cluster_fills && !settings.cluster_fill_above_nodes) {
-    layeredImage = overlayClustersFillLayer(ctx, layeredImage, clusterImprints, modalities)
+    layeredImage = overlayClustersFillLayer(ctx, layeredImage, precomputedPreTiling.clusterImprints, precomputedPreTiling.modalities)
   }
 
   // Finally we compile all the layers
@@ -646,16 +632,6 @@ function precomputeNetworkShapeImprint() {
 		out.on('finish', () =>  console.log('The PNG file for shape contour monitoring was created.'))
 	}
 
-  // SAVE PNG
-  if (options.step_save_blurred_canvas) {
-  	ctx.putImageData( imgd, 0, 0 )
-	  var fname = 'network shape monitoring'
-	  const out = fs.createWriteStream(__dirname + '/data/'+fname+'.png')
-		const stream = newCanvas.createPNGStream()
-		stream.pipe(out)
-		out.on('finish', () =>  console.log('The PNG file for shape contour monitoring was created.'))
-	}
-
 	// Find contour
 	var values = imgd.data.filter(function(d,i){ return i%4==3 })
 	var contour = d3.contours()
@@ -682,91 +658,68 @@ function precomputeNetworkShapeImprint() {
 	return {ratio:options.ratio, contour:contour}
 }
 
-function precomputeClusterImprints(modalities, voronoiData, attId) {
-  var options = {
-    // Steps
-    step_blur: true,
-    step_contrast: true,
-    step_contrast_adjust_spread: true,
-    
-    voronoi_paint_distance: true,
-    blur_radius: 0.01 * settings.cluster_smoothness * Math.min(voronoiData.width, voronoiData.height) / settings.zoom_window_size,
-    contrast_steepness: Infinity, // More = more abrupt contour. ex: 0.03 for a slight gradient
-    contrast_threshold: 0.15, // At which alpha level it "finds" the cluster (must remain low)
-    contrast_postprocessing_threshold: 1-settings.cluster_spreading, // Idem on a secondary pass
-    contrast_postprocessing_blur_radius: 0.03 * Math.min(voronoiData.width, voronoiData.height) / settings.zoom_window_size,
+function precomputeClusterImprints(modalities, attId) {
+  var options = {}
+
+  if (settings.width>settings.max_precomputations_size) {
+    options.ratio = settings.max_precomputations_size/settings.width
+    options.width = Math.floor(options.ratio*settings.width)
+    options.height = Math.floor(options.ratio*settings.height)
+  } else {
+    options.ratio = 1
+    options.width = settings.width
+    options.height = settings.height
   }
+  
+  options.node_size_margin = 5 * Math.min(options.width, options.height) / 1000 / settings.zoom_window_size
+  options.node_size_factor = settings.cluster_shape_size // above 0, default 1
+  options.blur_radius = settings.cluster_shape_smoothness * Math.min(options.width, options.height) / 1000 / settings.zoom_window_size
+  options.gradient_threshold = 1-settings.cluster_shape_swelling // Idem on a secondary pass
 
   var imprintsByModality = {}
   modalities.forEach(function(modality, i){
     log("Precompute cluster shape for "+modality+"...")
 
     // New Canvas
-    var newCanvas = createCanvas()
-    newCanvas.width = voronoiData.width
-    newCanvas.height = voronoiData.height
-    var ctx = newCanvas.getContext("2d")
+	  var newCanvas = createCanvas()
+	  newCanvas.width = options.width
+	  newCanvas.height = options.height
+	  var ctx = newCanvas.getContext("2d")
 
-    // Paint the voronoi "imprint" of the cluster
+	  g.nodes()
+	  	.filter(function(nid){
+	  		return g.getNodeAttribute(nid, attId) == modality
+	  	})
+	  	.forEach(function(nid){
+		    var n = g.getNodeAttributes(nid)
+		    var radius = options.node_size_margin + options.node_size_factor * options.ratio * n.size * settings.node_size
+		    var nx = options.ratio * n.x
+		    var ny = options.ratio * n.y
 
-    var imgd = ctx.getImageData(0, 0, voronoiData.width, voronoiData.height)
-    var pix = imgd.data
-    var i, pixlen
-    for ( i = 0, pixlen = pix.length; i < pixlen; i += 4 ) {
-      var vid = voronoiData.vidPixelMap[i/4]
-      if (vid > 0 && g.getNodeAttribute(voronoiData.nodesIndex[vid], attId) == modality) {
-        pix[i  ] = 0 // red
-        pix[i+1] = 0 // green
-        pix[i+2] = 0 // blue
-        if (options.voronoi_paint_distance) {
-          pix[i+3] = Math.floor(255 - voronoiData.dPixelMap[i/4])
-        } else {
-          pix[i+3] = 255 // alpha
-        }
-      }
-    }
+		    ctx.beginPath()
+		    ctx.arc(nx, ny, radius, 0, 2 * Math.PI, false)
+		    ctx.lineWidth = 0
+		    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
+		    ctx.shadowColor = 'transparent'
+		    ctx.fill()
+		  })
 
-    // Pre-treatment: Make the imprint of the voronoï more natural
-    // Add a slight blur (but keep the original)
-    imgd = mergeLayers([
-      imgd,
-      blur(imgd, 0.005 * Math.min(voronoiData.width, voronoiData.height) / settings.zoom_window_size)
-    ])
-
-    // Convolute: slight blur for antialiasing
-    imgd = convolute(imgd,
-    [  0, .1,  0,
-      .1, .6, .1,
-       0, .1,  0 ]
-    )
+	  var imgd = ctx.getImageData(0, 0, options.width, options.height)
 
     // Blur
-    if (options.step_blur) {
-      // Blur
-      imgd = blur(imgd, options.blur_radius)
+    imgd = blur(imgd, options.blur_radius, ctx)
+    // Normalize alpha at 80% (80% normalised & 20% original)
+    imgd = normalizeAlpha(imgd, 0, 255, 0.8, ctx)
 
-      // Normalize alpha at 10% (helps with edge cases where alpha becomes very low)
-      imgd = normalizeAlpha(imgd, 0, 255, 0.1)
-    }
+		// Find contour
+		var values = imgd.data.filter(function(d,i){ return i%4==3 })
+		var contour = d3.contours()
+	    .size([options.width, options.height])
+	    .thresholds(d3.range(0, 255))
+	    .contour(values, Math.round(255*options.gradient_threshold));
 
-    // Threshold the "cloud"
-    if (options.step_contrast) {
-      imgd = alphacontrast(imgd, 0, options.contrast_threshold, options.contrast_steepness)
-    }
-
-    // Postprocessing: blur then re-threshold
-    if (options.step_contrast_adjust_spread) {
-      // Blur
-      imgd = blur(imgd, options.contrast_postprocessing_blur_radius)
-
-      // Normalize alpha at 50% (helps with edge cases where alpha becomes very low)
-      imgd = normalizeAlpha(imgd, 0, 255, 0.5)
-
-      // Threshold
-      imgd = alphacontrast(imgd, 0, options.contrast_postprocessing_threshold, options.contrast_steepness)
-    }
     report("...done.")
-    imprintsByModality[modality] = imgd
+    imprintsByModality[modality] = {ratio:options.ratio, contour:contour}
   })
   return imprintsByModality
 }
@@ -889,28 +842,7 @@ function overlayClustersFillLayer(ctx, backgroundImg, clusterImprints, modalitie
   .forEach(function(modality, i){
     log("Draw cluster fill for "+modality+"...")
 
-    // Clear canvas
-    ctx.clearRect(0, 0, settings.width, settings.height)
-
-    // Draw and rescale the imprint if necessary
-    var imgd
-    var ratio = settings.width/settings.max_precomputations_size
-    if (ratio>1) {
-      var canvas2=createCanvas()
-      canvas2.width=settings.width
-      canvas2.height=settings.height
-      var ctx2=canvas2.getContext("2d")
-      ctx2.putImageData(clusterImprints[modality], 0, 0)
-      ctx.scale(ratio, ratio)
-      ctx.drawImage(ctx2.canvas,0,0)
-      imgd = ctx.getImageData(0, 0, settings.width, settings.height)
-      ctx.setTransform(1, 0, 0, 1, 0, 0)
-      imgd = processRescaledImprint(imgd)
-    } else {
-      imgd = clusterImprints[modality]
-    }
-
-    var color
+	  var color
     if (settings.cluster_fill_color_by_modality) {
       color = settings.node_clusters.default_color || settings.cluster_fill_color_default || "#444"
       if (settings.node_clusters.modalities[modality]) {
@@ -919,72 +851,41 @@ function overlayClustersFillLayer(ctx, backgroundImg, clusterImprints, modalitie
     } else {
       color = settings.cluster_fill_color_default
     }
-    var pix = imgd.data
-    var rgb = d3.color(color)
-    var i, pixlen
-    for ( i = 0, pixlen = pix.length; i < pixlen; i += 4 ) {
-      pix[i  ] = rgb.r // red
-      pix[i+1] = rgb.g // green
-      pix[i+2] = rgb.b // blue
-      pix[i+3] = Math.floor(settings.cluster_fill_alpha * pix[i+3]) // alpha
-    }
+    color = d3.color(color)
+	  color.opacity = settings.cluster_fill_alpha
 
-    // Convolute: slight blur (for antialiasing)
-    imgd = convolute(imgd,
-    [ 1/9, 1/9, 1/9,
-      1/9, 1/9, 1/9,
-      1/9, 1/9, 1/9 ]
-    )
-
-    /// Merge with background
-
-    // Paint bottom layer
+	  // Paint bottom layer
     ctx.putImageData(backgroundImg, 0, 0)
 
-    // Create temporary canvas for top layer
-    var canvas2=createCanvas()
-    canvas2.width=backgroundImg.width
-    canvas2.height=backgroundImg.height
-    var ctx2=canvas2.getContext("2d")
-    ctx2.putImageData(imgd, 0, 0)
-
     ctx.globalCompositeOperation = "hard-light"
-    ctx.drawImage(canvas2,0,0)
+
+    var clusterImprint = clusterImprints[modality]
+		const path = d3.geoPath(null, ctx)
+		ctx.translate(-xtile*settings.width, -ytile*settings.height)
+		ctx.scale(settings.tile_factor/clusterImprint.ratio, settings.tile_factor/clusterImprint.ratio)
+		ctx.beginPath()
+	  path(clusterImprint.contour)
+	  ctx.fillStyle = color.toString()
+	  ctx.fill()
+
+		// Reset current transformation matrix to the identity matrix
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+
     ctx.globalCompositeOperation = "source-over"
 
     backgroundImg = ctx.getImageData(0, 0, backgroundImg.width, backgroundImg.height)
 
-    report("...done.")
+	  report("...done.")
   })
   return backgroundImg
 }
 
 function drawClustersContourLayer(ctx, clusterImprints, modalities) {
   return mergeLayers(modalities.map(function(modality, i){
-    log("Draw cluster contour for "+modality+"...")
 
-    // Clear canvas
-    ctx.clearRect(0, 0, settings.width, settings.height);
-    
-    // Draw and rescale the imprint if necessary
-    var imgd
-    var ratio = settings.width/settings.max_precomputations_size
-    if (ratio>1) {
-      var canvas2=createCanvas()
-      canvas2.width=settings.width
-      canvas2.height=settings.height
-      var ctx2=canvas2.getContext("2d")
-      ctx2.putImageData(clusterImprints[modality], 0, 0)
-      ctx.scale(ratio, ratio)
-      ctx.drawImage(ctx2.canvas,0,0)
-      imgd = ctx.getImageData(0, 0, settings.width, settings.height)
-      ctx.setTransform(1, 0, 0, 1, 0, 0)
-      imgd = processRescaledImprint(imgd)
-    } else {
-      imgd = clusterImprints[modality]
-    }
+  	log("Draw cluster contour for "+modality+"...")
 
-    var color
+	  var color
     if (settings.cluster_contour_color_by_modality) {
       color = settings.node_clusters.default_color || settings.cluster_contour_color_default || "#444"
       if (settings.node_clusters.modalities[modality]) {
@@ -993,44 +894,29 @@ function drawClustersContourLayer(ctx, clusterImprints, modalities) {
     } else {
       color = settings.cluster_contour_color_default
     }
+    color = d3.color(color)
+	  color.opacity = settings.cluster_contour_alpha
 
-    // Draw the contour from the filling by convolution
-    // Convolute: slight blur (for antialiasing)
-    imgd = convolute(imgd,
-    [  0, .1,  0,
-      .1, .6, .1,
-       0, .1,  0 ]
-    )
+	  // Clear canvas
+    ctx.clearRect(0, 0, settings.width, settings.height);
 
-    // Convolute: contour
-    imgd = convolute(imgd,
-    [  0, -1,  0,
-      -1,  4, -1,
-       0, -1,  0 ]
-    )
+    var clusterImprint = clusterImprints[modality]
+		const path = d3.geoPath(null, ctx)
+		ctx.translate(-xtile*settings.width, -ytile*settings.height)
+		ctx.scale(settings.tile_factor/clusterImprint.ratio, settings.tile_factor/clusterImprint.ratio)
+		ctx.beginPath()
+	  path(clusterImprint.contour)
+	  ctx.lineWidth = settings.network_shape_contour_thickness
+	  ctx.fillStyle = 'rgba(0, 0, 0, 0)'
+	  ctx.strokeStyle = color.toString()
+	  
+	  ctx.stroke()
 
-    // Trick for thickness
-    for ( var i=1; i<settings.cluster_contour_thickness*Math.min(settings.width, settings.height) / 1000 / settings.zoom_window_size; i++) {
-      // Convolute: blur+thicken
-      imgd = convolute(imgd,
-      [ .1, .3, .1,
-        .3, .8, .3, 
-        .1, .3, .1 ]
-      )
-    }
+		// Reset current transformation matrix to the identity matrix
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-    var pix = imgd.data
-    var rgb = d3.color(color)
-    var i, pixlen
-    for ( i = 0, pixlen = pix.length; i < pixlen; i += 4 ) {
-      pix[i  ] = rgb.r // red
-      pix[i+1] = rgb.g // green
-      pix[i+2] = rgb.b // blue
-      pix[i+3] = Math.floor(settings.cluster_contour_alpha * pix[i+3]) // alpha
-    }
-
-    report("...done.")
-    return imgd
+	  report("...done.")
+    return ctx.getImageData(0, 0, settings.width, settings.height)
   }))
 }
 
@@ -1512,92 +1398,6 @@ function drawNodeLabelsLayer(ctx, nodesBySize_) {
       )
     })
   }
-  report("...done.")
-  return ctx.getImageData(0, 0, settings.width, settings.height)
-}
-
-function drawClusterLabelsLayer(ctx, modalities, centroidsByModality) {
-  log("Draw cluster labels...")
-
-  var options = {}
-  options.draw_text_anchor = false // for monitoring purpose
-  options.draw_label = true // idem
-  options.font_size = settings.cluster_label_font_size * Math.min(settings.width, settings.height) / 1000
-  options.font_weight = 300
-  options.font_family = "Raleway"
-  options.border_thickness = 2*settings.cluster_label_outline_thickness * Math.min(settings.width, settings.height) / 1000
-  options.border_color = function(c){return c.toString()}
-  options.label_color = function(c){return "#FFF"}
-
-  // Clear canvas
-  ctx.clearRect(0, 0, settings.width, settings.height)
-
-  var ratio = settings.width/settings.max_precomputations_size
-
-  modalities.forEach(function(modality, i){
-    var color = settings.node_clusters.default_color || "#444"
-    if (settings.node_clusters.modalities[modality]) {
-      color = settings.node_clusters.modalities[modality].color
-    }
-
-    var centroid = centroidsByModality[modality]
-    if (ratio>1) {
-      centroid = centroid.map(function(d){
-        return d*ratio
-      })
-    }
-    if ( !isNaN(centroid[0]) && !isNaN(centroid[1]) ) {
-
-      var label = modality
-      if (settings.node_clusters.modalities[modality] && settings.node_clusters.modalities[modality].label) {
-        label = settings.node_clusters.modalities[modality].label
-      }
-      var x = centroid[0]
-      var y = centroid[1]
-      
-      if (options.draw_label) {
-        ctx.font = options.font_weight + " italic " + options.font_size+"px "+options.font_family
-        ctx.lineCap="round"
-        ctx.lineJoin="round"
-        ctx.lineWidth = options.border_thickness
-        ctx.fillStyle = options.border_color(color)
-        ctx.strokeStyle = options.border_color(color)
-        ctx.textAlign = "center"
-        ctx.fillText(
-          label
-        , x
-        , y + 0.4*options.font_size
-        )
-        ctx.strokeText(
-          label
-        , x
-        , y + 0.4*options.font_size
-        )
-        ctx.lineWidth = 0
-        ctx.fillStyle = options.label_color(color)
-        ctx.fillText(
-          label
-        , x
-        , y + 0.4*options.font_size
-        )
-      }
-
-      if (options.draw_text_anchor) {
-        ctx.beginPath()
-        ctx.arc(x, y, 10, 0, 2 * Math.PI, false)
-        ctx.lineWidth = 0
-        ctx.fillStyle = "#000"
-        ctx.shadowColor = 'transparent'
-        ctx.fill()
-        ctx.beginPath()
-        ctx.arc(x, y, 4, 0, 2 * Math.PI, false)
-        ctx.lineWidth = 0
-        ctx.fillStyle = options.border_color(color)
-        ctx.shadowColor = 'transparent'
-        ctx.fill()
-      }
-    }
-  })
   report("...done.")
   return ctx.getImageData(0, 0, settings.width, settings.height)
 }
