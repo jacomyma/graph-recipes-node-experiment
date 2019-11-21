@@ -53,12 +53,12 @@ settings.zoom_point = {x:0.5, y:0.5} // range from 0 to 1
 // Decide which layers are drawn.
 // The settings for each layer are below.
 settings.draw_background = true
-settings.draw_network_shape_fill = true
-settings.draw_network_shape_contour = false
+settings.draw_network_shape_fill = false
+settings.draw_network_shape_contour = true
 settings.draw_cluster_fills = false
 settings.draw_cluster_contours = false
 settings.draw_cluster_labels = false
-settings.draw_edges = true
+settings.draw_edges = false
 settings.draw_nodes = true
 settings.draw_node_labels = true
 
@@ -476,7 +476,7 @@ function precomputeModalities() {
 }
 
 function precomputeVoronoi() {
-  log("Precompute Voronoi")
+  log("Precompute Voronoi...")
 
   var i
   var x
@@ -678,6 +678,7 @@ function precomputeNetworkShapeImprint() {
 		out.on('finish', () =>  console.log('The PNG file for shape contour monitoring was created.'))
 	}
   
+  report("...done.")
 	return {ratio:options.ratio, contour:contour}
 }
 
@@ -853,71 +854,34 @@ function drawNetworkShapeFillLayer(ctx, networkShapeImprint) {
 	// Reset current transformation matrix to the identity matrix
 	ctx.setTransform(1, 0, 0, 1, 0, 0);
 
+  report("...done.")
   return ctx.getImageData(0, 0, settings.width, settings.height)
 }
 
 function drawNetworkShapeContourLayer(ctx, networkShapeImprint) {
-  log("Draw network shape (contour)...")
+	log("Draw network shape (contour)...")
   // Clear canvas
   ctx.clearRect(0, 0, settings.width, settings.height);
+  
+  var color = d3.color(settings.network_shape_contour_color)
+  color.opacity = settings.network_shape_contour_alpha
 
-  // Draw and rescale the imprint if necessary
-  var imgd
-  var ratio = settings.width/settings.max_precomputations_size
-  if (ratio>1) {
-    var canvas2=createCanvas()
-    canvas2.width=settings.width
-    canvas2.height=settings.height
-    var ctx2=canvas2.getContext("2d")
-    ctx2.putImageData(networkShapeImprint, 0, 0)
-    ctx.scale(ratio, ratio)
-    ctx.drawImage(ctx2.canvas,0,0)
-    imgd = ctx.getImageData(0, 0, settings.width, settings.height)
-    ctx.setTransform(1, 0, 0, 1, 0, 0)
-    imgd = processRescaledImprint(imgd)
-  } else {
-    imgd = networkShapeImprint
-  }
+	const path = d3.geoPath(null, ctx)
+	ctx.translate(-xtile*settings.width, -ytile*settings.height)
+	ctx.scale(settings.tile_factor/networkShapeImprint.ratio, settings.tile_factor/networkShapeImprint.ratio)
+	ctx.beginPath()
+  path(networkShapeImprint.contour)
+  ctx.lineWidth = settings.network_shape_contour_thickness
+  ctx.fillStyle = 'rgba(0, 0, 0, 0)'
+  ctx.strokeStyle = color.toString()
+  
+  ctx.stroke()
 
-  var color = settings.network_shape_contour_color
-
-  // Draw the contour from the filling by convolution
-  // Convolute: slight blur (for antialiasing)
-  imgd = convolute(imgd,
-  [  0, .1,  0,
-    .1, .6, .1,
-     0, .1,  0 ]
-  )
-
-  // Convolute: contour
-  imgd = convolute(imgd,
-  [  0, -1,  0,
-    -1,  4, -1,
-     0, -1,  0 ]
-  )
-
-  // Trick for thickness
-  for ( var i=1; i<settings.network_shape_contour_thickness*Math.min(settings.width, settings.height) / 1000 / settings.zoom_window_size; i++) {
-    // Convolute: blur+thicken
-    imgd = convolute(imgd,
-    [ .1, .3, .1,
-      .3, .8, .3, 
-      .1, .3, .1 ]
-    )
-  }
-
-  var pix = imgd.data
-  var rgb = d3.color(color)
-  var i, pixlen
-  for ( i = 0, pixlen = pix.length; i < pixlen; i += 4 ) {
-    pix[i  ] = rgb.r // red
-    pix[i+1] = rgb.g // green
-    pix[i+2] = rgb.b // blue
-    pix[i+3] = Math.floor(settings.network_shape_contour_alpha * pix[i+3]) // alpha
-  }
+	// Reset current transformation matrix to the identity matrix
+	ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   report("...done.")
-  return imgd
+  return ctx.getImageData(0, 0, settings.width, settings.height)
 }
 
 function overlayClustersFillLayer(ctx, backgroundImg, clusterImprints, modalities) {
