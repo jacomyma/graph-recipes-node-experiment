@@ -34,10 +34,10 @@ settings.save_at_the_end = true
 // Image size and resolution
 settings.width =  5000 // in pixels
 settings.height = 5000 // in pixels
-settings.tile_factor = 2
+settings.tile_factor = 1 // Integer, default 1. Number of rows and columns of the grid of exported images.
 
 // Reference pen size (determines many line thicknesses)
-settings.pen_size = 0.2
+settings.pen_size = 0.5
 
 // Zoom:
 // You can zoon on a given point of the network
@@ -52,12 +52,12 @@ settings.zoom_point = {x:0.5, y:0.5} // range from 0 to 1
 // Decide which layers are drawn.
 // The settings for each layer are below.
 settings.draw_background = true
-settings.draw_network_shape_fill = false
+settings.draw_network_shape_fill = true
 settings.draw_network_shape_contour = false
 settings.draw_cluster_fills = false
 settings.draw_cluster_contours = false
 settings.draw_cluster_labels = false
-settings.draw_edges = true
+settings.draw_edges = false
 settings.draw_nodes = true
 settings.draw_node_labels = false
 
@@ -69,7 +69,8 @@ settings.background_color = "#e3d6c1"
 // Layer: Network shape
 //        (a potato for the whole network)
 // ...generic structure
-settings.network_shape_spreading = 0.9 // Range: 0.01 to 0.99 // Balanced: 0.5 // Acts on size
+settings.network_shape_size = 2 // Range: more than 0, default to 1.
+settings.network_shape_swelling = 0.9 // Range: 0.01 to 0.99 // Balanced: 0.5 // Acts on size
 settings.network_shape_smoothness = 0 // Range: 0 to 10 or more // Makes rounder clusters
 // ...shape fill
 settings.network_shape_fill_alpha = 0.4 // Opacity // Range from 0 to 1
@@ -155,7 +156,7 @@ settings.node_clusters = {
 
 // Advanced settings
 settings.adjust_voronoi_range = 5 // Factor // Larger node halo + slightly bigger clusters
-settings.max_voronoi_size = 500 // Above that size, we approximate the voronoi
+settings.max_precomputations_size = 500 // Above that size, we approximate the voronoi
 
 /// (END OF SETTINGS)
 
@@ -170,6 +171,9 @@ addMissingVisualizationData()
 
 // Create the canvas where the image will be rendered
 var canvas, ctx
+
+rescaleGraphToGraphicSpace(false)
+var precomputedPreTiling = precomputePreTiling()
 
 var xtile, ytile
 for (xtile=0; xtile<settings.tile_factor; xtile++) {
@@ -187,32 +191,35 @@ for (xtile=0; xtile<settings.tile_factor; xtile++) {
 		rescaleGraphToGraphicSpace(true)
 
 		// Build image
-		build()
+		build(precomputedPreTiling)
 	}
 }
 
 /// PROCESS
 
-function build(){
+function precomputePreTiling() {
+	var precomputedPreTiling = {}
+	if ( settings.draw_network_shape_fill
+    || settings.draw_network_shape_contour
+  ) {
+    precomputedPreTiling.networkShapeImprint = precomputeNetworkShapeImprint()
+  }
+	return precomputedPreTiling
+}
+
+function build(precomputedPreTiling) {
   // Precompute stuff:
   //  Depending on the settings, some things must be precomputed
   var nodesBySize, modalities, voronoiData, networkShapeImprint, clusterImprints, centroidsByModality
   if (settings.draw_nodes || settings.draw_node_labels) {
     nodesBySize = precomputeNodesBySize()
   }
-  if ( settings.draw_network_shape_fill
-    || settings.draw_network_shape_contour
-    || settings.draw_cluster_fills
+  if ( settings.draw_cluster_fills
     || settings.draw_cluster_contours
     || settings.draw_cluster_labels
     || (settings.draw_edges && settings.edge_high_quality)
   ) {
       voronoiData = precomputeVoronoi()
-  }
-  if ( settings.draw_network_shape_fill
-    || settings.draw_network_shape_contour
-  ) {
-    networkShapeImprint = precomputeNetworkShapeImprint(voronoiData)
   }
   if ( settings.draw_cluster_fills
     || settings.draw_cluster_contours
@@ -245,14 +252,14 @@ function build(){
   // Draw network shape fill
   if (settings.draw_network_shape_fill) {
     layeredImage = drawLayerOnTop(layeredImage,
-      drawNetworkShapeFillLayer(ctx, networkShapeImprint)
+      drawNetworkShapeFillLayer(ctx, precomputedPreTiling.networkShapeImprint)
     )
   }
 
   // Draw network shape contour
   if (settings.draw_network_shape_contour) {
     layeredImage = drawLayerOnTop(layeredImage,
-      drawNetworkShapeContourLayer(ctx, networkShapeImprint)
+      drawNetworkShapeContourLayer(ctx, precomputedPreTiling.networkShapeImprint)
     )
   }
 
@@ -476,8 +483,8 @@ function precomputeVoronoi() {
   var d
 
   var options = {}
-  if (settings.width>settings.max_voronoi_size) {
-    options.ratio = settings.max_voronoi_size/settings.width
+  if (settings.width>settings.max_precomputations_size) {
+    options.ratio = settings.max_precomputations_size/settings.width
     options.width = Math.floor(options.ratio*settings.width)
     options.height = Math.floor(options.ratio*settings.height)
   } else {
@@ -571,7 +578,7 @@ function precomputeVoronoi() {
   }
 }
 
-function precomputeNetworkShapeImprint(voronoiData) {
+function precomputeNetworkShapeImprint() {
   log("Precompute network shape...")
 
   var options = {}
@@ -580,38 +587,54 @@ function precomputeNetworkShapeImprint(voronoiData) {
   options.step_contrast = true
   options.step_contrast_adjust_spread = true
 
-  options.voronoi_paint_distance = true
-  options.blur_radius = 0.01 * settings.network_shape_smoothness * Math.min(voronoiData.width, voronoiData.height) / settings.zoom_window_size
-  options.contrast_steepness = Infinity // More = more abrupt contour. ex: 0.03 for a slight gradient
-  options.contrast_threshold = 0.15 // At which alpha level it "finds" the cluster (must remain low)
-  options.contrast_postprocessing_threshold = 1-settings.network_shape_spreading // Idem on a secondary pass
-  options.contrast_postprocessing_blur_radius = 0.03 * Math.min(voronoiData.width, voronoiData.height) / settings.zoom_window_size
+  if (settings.width>settings.max_precomputations_size) {
+    options.ratio = settings.max_precomputations_size/settings.width
+    options.width = Math.floor(options.ratio*settings.width)
+    options.height = Math.floor(options.ratio*settings.height)
+  } else {
+    options.ratio = 1
+    options.width = settings.width
+    options.height = settings.height
+  }
+  
+  // options.contrast_steepness = Infinity // More = more abrupt contour. ex: 0.03 for a slight gradient
+  // options.contrast_threshold = 0.15 // At which alpha level it "finds" the cluster (must remain low)
+  // options.contrast_postprocessing_blur_radius = 0.03 * Math.min(options.width, options.height) / settings.zoom_window_size
+  options.node_size_margin = 2 * Math.min(options.width, options.height) / 1000 / settings.zoom_window_size
+  options.node_size_factor = settings.network_shape_size // above 0, default 1
+  options.blur_radius = 0.01 * settings.network_shape_smoothness * Math.min(options.width, options.height) / settings.zoom_window_size
+  options.gradient_threshold = 1-settings.network_shape_swelling // Idem on a secondary pass
 
   // New Canvas
   var newCanvas = createCanvas()
-  newCanvas.width = voronoiData.width
-  newCanvas.height = voronoiData.height
+  newCanvas.width = options.width
+  newCanvas.height = options.height
   var ctx = newCanvas.getContext("2d")
 
-  // Paint the voronoi "imprint" of the cluster
-  var imgd = ctx.getImageData(0, 0, voronoiData.width, voronoiData.height)
-  var pix = imgd.data
-  var i, pixlen
-  for ( i = 0, pixlen = pix.length; i < pixlen; i += 4 ) {
-    var vid = voronoiData.vidPixelMap[i/4]
-    if (vid > 0) {
-      pix[i  ] = 0 // red
-      pix[i+1] = 0 // green
-      pix[i+2] = 0 // blue
-      if (options.voronoi_paint_distance) {
-        pix[i+3] = Math.floor(255 - voronoiData.dPixelMap[i/4])
-      } else {
-        pix[i+3] = 255 // alpha
-      }
-    }
-  }
+  g.nodes().forEach(function(nid){
+    var n = g.getNodeAttributes(nid)
+    var radius = options.node_size_margin + options.node_size_factor * options.ratio * n.size * settings.node_size
+    var nx = options.ratio * n.x
+    var ny = options.ratio * n.y
 
+    ctx.beginPath()
+    ctx.arc(nx, ny, radius, 0, 2 * Math.PI, false)
+    ctx.lineWidth = 0
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
+    ctx.shadowColor = 'transparent'
+    ctx.fill()
+  })
+
+  // SAVE PNG
+  var fname = 'network shape'
+  const out = fs.createWriteStream(__dirname + '/data/'+fname+'.png')
+	const stream = newCanvas.createPNGStream()
+	stream.pipe(out)
+	out.on('finish', () =>  console.log('The PNG file was created.'))
   
+	return
+
+
   // Pre-treatment: Make the imprint of the voronoï more natural
   // Add a slight blur (but keep the original)
   imgd = mergeLayers([
@@ -813,9 +836,12 @@ function drawNetworkShapeFillLayer(ctx, networkShapeImprint) {
   // Clear canvas
   ctx.clearRect(0, 0, settings.width, settings.height);
   
+  // FIXME: remove the line below
+  return ctx.getImageData(0, 0, settings.width, settings.height)
+
   // Draw and rescale the imprint if necessary
   var imgd
-  var ratio = settings.width/settings.max_voronoi_size
+  var ratio = settings.width/settings.max_precomputations_size
   if (ratio>1) {
     var canvas2=createCanvas()
     canvas2.width=settings.width
@@ -860,7 +886,7 @@ function drawNetworkShapeContourLayer(ctx, networkShapeImprint) {
 
   // Draw and rescale the imprint if necessary
   var imgd
-  var ratio = settings.width/settings.max_voronoi_size
+  var ratio = settings.width/settings.max_precomputations_size
   if (ratio>1) {
     var canvas2=createCanvas()
     canvas2.width=settings.width
@@ -927,7 +953,7 @@ function overlayClustersFillLayer(ctx, backgroundImg, clusterImprints, modalitie
 
     // Draw and rescale the imprint if necessary
     var imgd
-    var ratio = settings.width/settings.max_voronoi_size
+    var ratio = settings.width/settings.max_precomputations_size
     if (ratio>1) {
       var canvas2=createCanvas()
       canvas2.width=settings.width
@@ -1001,7 +1027,7 @@ function drawClustersContourLayer(ctx, clusterImprints, modalities) {
     
     // Draw and rescale the imprint if necessary
     var imgd
-    var ratio = settings.width/settings.max_voronoi_size
+    var ratio = settings.width/settings.max_precomputations_size
     if (ratio>1) {
       var canvas2=createCanvas()
       canvas2.width=settings.width
@@ -1088,7 +1114,7 @@ function drawEdgesLayer(ctx, voronoiData) {
   var dPixelMap_u, vidPixelMap_u // unpacked versions
   if (options.display_voronoi || options.node_halo) {
     // Unpack voronoi
-    var ratio = Math.max(1, settings.width/settings.max_voronoi_size)
+    var ratio = Math.max(1, settings.width/settings.max_precomputations_size)
 
     if (g.order < 255) {
       vidPixelMap_u = new Uint8Array(settings.width * settings.height)
@@ -1373,7 +1399,7 @@ function drawNodeLabelsLayer(ctx, nodesBySize_) {
   // Deal with font weights
   //  Relative thicknesses for: Raleway
   var weights =     [ 100, 200, 300, 400, 500, 600, 700, 800, 900 ]
-  var thicknesses = [   2, 3.5,   5,   7, 9.5,  12,  15,  17,  21 ]
+  var thicknesses = [   2, 3.5,   5,   7, 9.5,  12,  15,  18,  21 ]
   var thicknessRatio = 120
   var thicknessToWeight = d3.scaleLinear()
     .domain(thicknesses)
@@ -1565,7 +1591,7 @@ function drawClusterLabelsLayer(ctx, modalities, centroidsByModality) {
   // Clear canvas
   ctx.clearRect(0, 0, settings.width, settings.height)
 
-  var ratio = settings.width/settings.max_voronoi_size
+  var ratio = settings.width/settings.max_precomputations_size
 
   modalities.forEach(function(modality, i){
     var color = settings.node_clusters.default_color || "#444"
@@ -1735,7 +1761,7 @@ function findCentroid(imgd, modality) {
 
   var total = 0
   var safeguard = 100
-  var w = Math.min(settings.width, settings.max_voronoi_size)
+  var w = Math.min(settings.width, settings.max_precomputations_size)
   var lasti, i, pixlen
 
   // Clone image data
