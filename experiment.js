@@ -8,7 +8,7 @@ const d3 = require('d3')
 // Read file
 var gexf_string;
 try {
-    gexf_string = fs.readFileSync('data/test.gexf', 'utf8');
+    gexf_string = fs.readFileSync('data/test_small.gexf', 'utf8');
     console.log('GEXF file loaded');    
 } catch(e) {
     console.log('Error:', e.stack);
@@ -35,10 +35,10 @@ settings.save_at_the_end = true
 // Image size and resolution
 settings.width =  5000 // in pixels
 settings.height = 5000 // in pixels
-settings.tile_factor = 2 // Integer, default 1. Number of rows and columns of the grid of exported images.
+settings.tile_factor = 1 // Integer, default 1. Number of rows and columns of the grid of exported images.
 
 // Reference pen size (determines many line thicknesses)
-settings.pen_size = 0.2
+settings.pen_size = 0.5
 
 // Zoom:
 // You can zoon on a given point of the network
@@ -46,18 +46,18 @@ settings.pen_size = 0.2
 // because you must find the right point by trial and error.
 // By default, a slight unzoom gives a welcome space on the borders
 settings.zoom_enabled = true
-settings.zoom_window_size = 1.2 // range from 0 to 1 (dezooms if >1)
-settings.zoom_point = {x:0.5, y:0.5} // range from 0 to 1
+settings.zoom_window_size = 1.1 // range from 0 to 1 (dezooms if >1)
+settings.zoom_point = {x:0.6, y:0.5} // range from 0 to 1
 
 // Layers:
 // Decide which layers are drawn.
 // The settings for each layer are below.
 settings.draw_background = true
 settings.draw_network_shape_fill = false
-settings.draw_network_shape_contour = true
-settings.draw_cluster_fills = true
+settings.draw_network_shape_contour = false
+settings.draw_cluster_fills = false
 settings.draw_cluster_contours = false
-settings.draw_edges = true
+settings.draw_edges = false
 settings.draw_nodes = true
 settings.draw_node_labels = true
 
@@ -102,13 +102,15 @@ settings.edge_alpha = 1 // Opacity // Range from 0 to 1
 settings.edge_high_quality = true // Halo around nodes // Time-consuming
 
 // Layer: Nodes
+settings.adjust_voronoi_range = 100 // Factor // Larger node halo
 settings.node_size = 0.8 // Factor to adjust the nodes drawing size
 
 // Layer: Node labels
-settings.label_font_min_size = 1.8 // in pt based on 1MP 72dpi
-settings.label_font_max_size = 6  // in pt based on 1MP 72dpi
-settings.label_border_thickness = 1.2
-
+settings.label_max_length = 64 // Number of characters before truncate. Infinity is a valid value.
+settings.label_font_min_size = 12 // in pt based on 1MP 72dpi
+settings.label_font_max_size = 60  // in pt based on 1MP 72dpi
+settings.label_font_thickness = 3 * settings.pen_size
+settings.label_border_thickness = 5 * settings.pen_size
 
 // Main clusters and color code:
 // Clusters are defined by the modalities of a given attribute.
@@ -152,8 +154,8 @@ settings.node_clusters = {
   "default_color": "#5f6f79"}
 
 // Advanced settings
-settings.adjust_voronoi_range = 250 // Factor // Larger node halo + slightly bigger clusters
 settings.max_precomputations_size = 2500 // Above that size, we approximate the voronoi
+settings.label_collision_size = 2500 // Canvas size for label collision detection
 
 /// (END OF SETTINGS)
 
@@ -175,8 +177,6 @@ var precomputedPreTiling = precomputePreTiling()
 var xtile, ytile
 for (xtile=0; xtile<settings.tile_factor; xtile++) {
 	for (ytile=0; ytile<settings.tile_factor; ytile++) {
-// for (xtile=0; xtile<1; xtile++) {
-// 	for (ytile=0; ytile<1; ytile++) {
 		
 		canvas = createCanvas(settings.width, settings.height)
 		ctx = canvas.getContext("2d")
@@ -188,7 +188,8 @@ for (xtile=0; xtile<settings.tile_factor; xtile++) {
 		rescaleGraphToGraphicSpace(true)
 
 		// Build image
-		build(precomputedPreTiling)
+		// if (xtile==0 && ytile==1)
+			build(precomputedPreTiling)
 	}
 }
 
@@ -196,11 +197,13 @@ for (xtile=0; xtile<settings.tile_factor; xtile++) {
 
 function precomputePreTiling() {
 	var precomputedPreTiling = {}
+
 	if ( settings.draw_network_shape_fill
     || settings.draw_network_shape_contour
   ) {
     precomputedPreTiling.networkShapeImprint = precomputeNetworkShapeImprint()
   }
+
   if ( settings.draw_cluster_fills
     || settings.draw_cluster_contours
     || settings.draw_cluster_labels
@@ -213,21 +216,24 @@ function precomputePreTiling() {
     precomputedPreTiling.clusterImprints = precomputeClusterImprints(precomputedPreTiling.modalities, settings.node_clusters.attribute_id)
   }
 
+  if (settings.draw_nodes || settings.draw_node_labels) {
+    precomputedPreTiling.nodesBySize = precomputeNodesBySize()
+  }
+
+  // Draw node labels
+  if (settings.draw_node_labels) {
+    precomputedPreTiling.visibleLabels = precomputeVisibleLabels(precomputedPreTiling.nodesBySize)
+  }
+
 	return precomputedPreTiling
 }
 
 function build(precomputedPreTiling) {
   // Precompute stuff:
   //  Depending on the settings, some things must be precomputed
-  var nodesBySize, modalities, voronoiData, networkShapeImprint, clusterImprints, centroidsByModality
-  if (settings.draw_nodes || settings.draw_node_labels) {
-    nodesBySize = precomputeNodesBySize()
-  }
+  var modalities, voronoiData, networkShapeImprint, clusterImprints
   if ( settings.draw_edges && settings.edge_high_quality ) {
   	voronoiData = precomputeVoronoi()
-  }
-  if (settings.draw_cluster_labels) {
-    centroidsByModality = precomputeCentroids(ctx, modalities, clusterImprints)
   }
 
   // We draw the image layer by layer.
@@ -267,7 +273,7 @@ function build(precomputedPreTiling) {
   // Draw nodes
   if (settings.draw_nodes) {
     layeredImage = drawLayerOnTop(layeredImage,
-      drawNodesLayer(ctx, nodesBySize)
+      drawNodesLayer(ctx, precomputedPreTiling.nodesBySize)
     )
   }
 
@@ -281,7 +287,7 @@ function build(precomputedPreTiling) {
   // Draw node labels
   if (settings.draw_node_labels) {
     layeredImage = drawLayerOnTop(layeredImage,
-      drawNodeLabelsLayer(ctx, nodesBySize)
+      drawNodeLabelsLayer(ctx, precomputedPreTiling.visibleLabels)
     )
   }
 
@@ -724,44 +730,6 @@ function precomputeClusterImprints(modalities, attId) {
   return imprintsByModality
 }
 
-function precomputeCentroids(ctx, modalities, clusterImprints) {
-  var centroidsByModality = {}
-  modalities.forEach(function(modality, i){
-    log("Precompute cluster centroid for "+modality+"...")
-
-    var imgd_src = clusterImprints[modality]
-    var backup_centroid = findCentroid(imgd_src, modality)
-
-    // Clone image data
-    var imgd = ctx.createImageData(imgd_src.width, imgd_src.height);
-    imgd.data.set(imgd_src.data)
-
-    var pix = imgd.data
-    var i, pixlen, pix2
-
-    // Remove each other cluster imprint from this imprint
-    var m2, imgd2
-    for (m2 in clusterImprints) {
-      if (m2 != modality) {
-        imgd2 = clusterImprints[m2]
-        pix2 = imgd2.data
-        for ( i = 0, pixlen = pix.length; i < pixlen; i += 4 ) {
-          pix[i+3] = Math.max(0, pix[i+3] - pix2[i+3])
-        }
-      }
-    }
-
-    var centroid = findCentroid(imgd, modality)
-    if (centroid[0]) {
-      centroidsByModality[modality] = centroid
-    } else {
-      centroidsByModality[modality] = backup_centroid
-    }
-    report("...done.")
-  })
-  return centroidsByModality
-}
-
 function getEmptyLayer(ctx) {
   // Clear canvas
   ctx.clearRect(0, 0, settings.width, settings.height)
@@ -1041,7 +1009,7 @@ function drawEdgesLayer(ctx, voronoiData) {
 	        // Build path
 	        var iPixStep = 2.5 //Math.max(1.5, 0.7*options.edge_thickness)
 	        var l = Math.ceil(d/iPixStep)
-	        path = new Int16Array(3*l)
+	        path = new Int32Array(3*l)
 	        for (i=0; i<1; i+=iPixStep/d) {
 	          x = (1-i)*ns.x + i*nt.x
 	          y = (1-i)*ns.y + i*nt.y
@@ -1097,8 +1065,8 @@ function drawEdgesLayer(ctx, voronoiData) {
 	      // Draw path
 	      var x, y, o, lastx, lasty, lasto
 	      for (i=0; i<path.length; i+=3) {
-	        x = path[i] + options.jitter * (0.5 - Math.random())
-	        y = path[i+1] + options.jitter * (0.5 - Math.random())
+	        x = Math.floor( 1000 * (path[i] + options.jitter * (0.5 - Math.random())) ) / 1000
+	        y = Math.floor( 1000 * (path[i+1] + options.jitter * (0.5 - Math.random())) ) / 1000
 	        o = path[i+2]/255
 	        
 	        // Collapse opacity
@@ -1204,26 +1172,24 @@ function drawNodesLayer(ctx, nodesBySize) {
   return ctx.getImageData(0, 0, settings.width, settings.height)
 }
 
-function drawNodeLabelsLayer(ctx, nodesBySize_) {
-  log("Draw node labels...")
-  var options = {}
-  options.draw_labels = true
+function getNodeLabelSharedOptions(){
+	var options = {}
   options.label_count = Infinity
   options.colored_labels = true
   options.sized_labels = true
+  options.true_size = true // false: size adjusted to the right thickness (weight)
   options.label_spacing_factor = 3 // 1=normal; 2=box twice as wide/high etc.
   options.label_spacing_offset = 2 * Math.min(settings.width, settings.height)/1000
   options.font_family = 'Raleway'
   options.font_min_size = settings.label_font_min_size * Math.min(settings.width, settings.height)/1000
   options.font_max_size = settings.label_font_max_size * Math.min(settings.width, settings.height)/1000
   options.font_thickness_optical_correction = 0.9
-  options.text_thickness = settings.pen_size * Math.min(settings.width, settings.height)/1000
+  options.text_thickness = settings.label_font_thickness * Math.min(settings.width, settings.height)/1000
   options.border_thickness = settings.label_border_thickness * Math.min(settings.width, settings.height)/1000
   options.border_color = settings.background_color
-  options.pixmap_size = 1 + Math.floor(0.3 * options.font_min_size)
-  var i, x, y
-
-  // Deal with font weights
+  
+  // Note: here we put the scale in options because it is shared
+	// Deal with font weights
   //  Relative thicknesses for: Raleway
   var weights =     [ 100, 200, 300, 400, 500, 600, 700, 800, 900 ]
   var thicknesses = [   2, 3.5,   5,   7, 9.5,  12,  15,  18,  21 ]
@@ -1233,7 +1199,7 @@ function drawNodeLabelsLayer(ctx, nodesBySize_) {
     .range(weights)
 
   // We restrain the size to the proper steps of the scale
-  var normalizeFontSize = function(size) {
+  options.normalizeFontSize = function(size) {
   	// The target thickness is the pen size, which is fixed: options.text_thickness
   	// But to compute the weight, we must know the thickness for a standard size: 1
   	var thicknessForFontSize1 = thicknessRatio * options.text_thickness / size
@@ -1249,6 +1215,152 @@ function drawNodeLabelsLayer(ctx, nodesBySize_) {
     return [restrainedSize, actualWeight]
   }
 
+  return options
+}
+
+function precomputeVisibleLabels(nodesBySize_) {
+	log("Precompute visible node labels...")
+  var options = getNodeLabelSharedOptions()
+  options.download_image = true // For monitoring the process
+  options.ratio = settings.label_collision_size/settings.width
+  options.width = Math.floor(options.ratio*settings.width)
+  options.height = Math.floor(options.ratio*settings.height)
+  options.pixmap_size = 1// + Math.floor(0.3 * options.font_min_size)
+
+  var i, x, y, visibleLabels = []
+
+	var canvas = createCanvas(options.width, options.height)
+	var ctx = canvas.getContext("2d")
+	paintAll(ctx, options.width, options.height, '#FFF') // Useful for monitoring
+
+  // Reverse nodes by size order
+  var nodesBySize = nodesBySize_.slice(0)
+  nodesBySize.reverse()
+
+  // Init a pixel map of int for bounding boxes
+  var pixmapWidth = Math.ceil(options.width/options.pixmap_size)
+  var pixmapHeight = Math.ceil(options.height/options.pixmap_size)
+  var bbPixmap = new Uint8Array(pixmapWidth * pixmapHeight)
+  for (i in bbPixmap) {
+    bbPixmap[i] = 0 // 1 means "occupied"
+  }
+
+  // Compute scale for labels
+  var label_nodeSizeExtent = d3.extent(
+    nodesBySize.map(function(nid){
+      return options.ratio * g.getNodeAttribute(nid, "size")
+    })
+  )
+  if (label_nodeSizeExtent[0] == label_nodeSizeExtent[1]) {label_nodeSizeExtent[0] *= 0.9}
+
+  // Evaluate labels
+  var labelDrawCount = options.label_count
+  nodesBySize.forEach(function(nid){
+    if(labelDrawCount > 0){
+
+      var n = g.getNodeAttributes(nid)
+      var nx = options.ratio * n.x
+      var ny = options.ratio * n.y
+
+      var modality = settings.node_clusters.modalities[n[settings.node_clusters.attribute_id]]
+      var ncol
+      if (modality) {
+        ncol = d3.color(modality.color)
+      } else {
+        ncol = d3.color(settings.node_clusters.default_color || "#8B8B8B")
+      }
+
+      var radius = Math.max(settings.node_size * options.ratio * n.size, 2)
+
+      // Precompute the label
+      // var color = options.colored_labels ? tuneColorForLabel(ncol) : d3.color('#666')
+      var color = d3.color("#363835")
+      var fontSize = options.sized_labels
+        ? Math.floor(options.font_min_size + (options.ratio * n.size - label_nodeSizeExtent[0]) * (options.font_max_size - options.font_min_size) / (label_nodeSizeExtent[1] - label_nodeSizeExtent[0]))
+        : Math.floor(0.6 * options.font_min_size + 0.4 * options.font_max_size)
+
+      var sw = options.normalizeFontSize(fontSize)
+      if (!options.true_size) {
+        fontSize = sw[0]
+      }
+      var fontWeight = sw[1]
+      ctx.font = buildContextFontString(fontWeight, fontSize, options.font_family)
+
+      // Then, draw the label only if wanted
+      var labelCoordinates = {
+        x: nx + 0.6 * options.border_thickness + 1.05 * radius,
+        y: ny + 0.25 * fontSize
+      }
+
+      var label = truncateWithEllipsis(n.label.replace(/^https*:\/\/(www\.)*/gi, ''), settings.label_max_length)
+
+      // Bounding box
+      var bbox = getBBox(ctx, fontSize, labelCoordinates, label, options.label_spacing_factor, options.label_spacing_offset)
+
+      // Test bounding box collision
+      var collision = false
+      var bboxResizedX = Math.floor(bbox.x/options.pixmap_size)
+      var bboxResizedY = Math.floor(bbox.y/options.pixmap_size)
+      var bboxResizedX2 = Math.ceil((bbox.x + bbox.width)/options.pixmap_size)
+      var bboxResizedY2 = Math.ceil((bbox.y + bbox.height)/options.pixmap_size)
+      for (x = bboxResizedX; x<bboxResizedX2; x++) {
+        for (y = bboxResizedY; y<bboxResizedY2; y++) {
+          if (bbPixmap[x + (y*pixmapWidth)] == 1) {
+            collision = true
+            break
+            break
+          }
+        }
+      }
+      if (!collision) {
+
+        // Update bounding box data
+        for (x = bboxResizedX; x<bboxResizedX2; x++) {
+          for (y = bboxResizedY; y<bboxResizedY2; y++) {
+            bbPixmap[x + (y*pixmapWidth)] = 1
+          }
+        }
+
+        // Update count
+        labelDrawCount--
+
+        // Add to draw pipe
+        visibleLabels.push(nid)
+
+        if (options.download_image) {
+        	// Draw bounding box
+        	ctx.fillStyle = 'rgba(0, 0, 0, .2)'
+        	ctx.fillRect(bboxResizedX, bboxResizedY, bboxResizedX2-bboxResizedX, bboxResizedY2-bboxResizedY)
+        	// Draw label
+		      ctx.lineWidth = 0
+		      ctx.fillStyle = '#000'
+		      ctx.fillText(
+		        label
+		      , labelCoordinates.x
+		      , labelCoordinates.y
+		      )
+        }
+      }
+    }
+  })
+
+  if (options.download_image) {
+  	var imgd = ctx.getImageData(0, 0, options.width, options.height)
+  	downloadImageData(imgd, 'Monitoring labels')
+  }
+  
+
+  report("...done.")
+  return visibleLabels
+}
+
+function drawNodeLabelsLayer(ctx, visibleLabels) {
+  log("Draw node labels...")
+  var options = getNodeLabelSharedOptions()
+  options.draw_labels = true
+
+  var i, x, y
+
   // Clear canvas
   ctx.clearRect(0, 0, settings.width, settings.height)
 
@@ -1256,10 +1368,6 @@ function drawNodeLabelsLayer(ctx, nodesBySize_) {
   var bc = d3.color(options.border_color)
   bc.opacity = 0.1
   paintAll(ctx, settings.width, settings.height, bc.toString())
-
-  // Reverse nodes by size order
-  var nodesBySize = nodesBySize_.splice(0)
-  nodesBySize.reverse()
 
   // Draw each label
   if (options.draw_labels) {
@@ -1274,97 +1382,66 @@ function drawNodeLabelsLayer(ctx, nodesBySize_) {
 
     // Compute scale for labels
     var label_nodeSizeExtent = d3.extent(
-      nodesBySize.map(function(nid){
+      g.nodes().map(function(nid){
         return g.getNodeAttribute(nid, "size")
       })
     )
     if (label_nodeSizeExtent[0] == label_nodeSizeExtent[1]) {label_nodeSizeExtent[0] *= 0.9}
 
     // Draw labels
-    var labelDrawCount = options.label_count
-    var labelsToDraw = []
-    nodesBySize.forEach(function(nid){
-      if(labelDrawCount > 0){
+    var labelsStack = []
+    visibleLabels.forEach(function(nid){
 
-        var n = g.getNodeAttributes(nid)
-        var nx = n.x
-        var ny = n.y
+      var n = g.getNodeAttributes(nid)
+      var nx = n.x
+      var ny = n.y
 
-        var modality = settings.node_clusters.modalities[n[settings.node_clusters.attribute_id]]
-        var ncol
-        if (modality) {
-          ncol = d3.color(modality.color)
-        } else {
-          ncol = d3.color(settings.node_clusters.default_color || "#8B8B8B")
-        }
-
-        var radius = Math.max(settings.node_size * n.size, 2)
-
-        // Precompute the label
-        // var color = options.colored_labels ? tuneColorForLabel(ncol) : d3.color('#666')
-        var color = d3.color("#363835")
-        var fontSize = options.sized_labels
-          ? Math.floor(options.font_min_size + (n.size - label_nodeSizeExtent[0]) * (options.font_max_size - options.font_min_size) / (label_nodeSizeExtent[1] - label_nodeSizeExtent[0]))
-          : Math.floor(0.6 * options.font_min_size + 0.4 * options.font_max_size)
-
-        var sw = normalizeFontSize(fontSize)
-        fontSize = sw[0]
-        var fontWeight = sw[1]
-        ctx.font = buildContextFontString(fontWeight, fontSize, options.font_family)
-
-        // Then, draw the label only if wanted
-        var labelCoordinates = {
-          x: nx + 0.6 * options.border_thickness + 1.05 * radius,
-          y: ny + 0.25 * fontSize
-        }
-
-        var label = n.label.replace(/^https*:\/\/(www\.)*/gi, '')
-
-        // Bounding box
-        var bbox = getBBox(ctx, fontSize, labelCoordinates, label, options.label_spacing_factor, options.label_spacing_offset)
-
-        // Test bounding box collision
-        var collision = false
-        var bboxResizedX = Math.floor(bbox.x/options.pixmap_size)
-        var bboxResizedY = Math.floor(bbox.y/options.pixmap_size)
-        var bboxResizedX2 = Math.ceil((bbox.x + bbox.width)/options.pixmap_size)
-        var bboxResizedY2 = Math.ceil((bbox.y + bbox.height)/options.pixmap_size)
-        for (x = bboxResizedX; x<bboxResizedX2; x++) {
-          for (y = bboxResizedY; y<bboxResizedY2; y++) {
-            if (bbPixmap[x + (y*pixmapWidth)] == 1) {
-              collision = true
-              break
-              break
-            }
-          }
-        }
-        if (!collision) {
-
-          // Update bounding box data
-          for (x = bboxResizedX; x<bboxResizedX2; x++) {
-            for (y = bboxResizedY; y<bboxResizedY2; y++) {
-              bbPixmap[x + (y*pixmapWidth)] = 1
-            }
-          }
-
-          // Update count
-          labelDrawCount--
-
-          // Add to draw pipe
-          var l = {
-            label: label,
-            x: labelCoordinates.x,
-            y: labelCoordinates.y,
-            font: ctx.font,
-            color: color
-          }
-          labelsToDraw.push(l)
-        }
+      var modality = settings.node_clusters.modalities[n[settings.node_clusters.attribute_id]]
+      var ncol
+      if (modality) {
+        ncol = d3.color(modality.color)
+      } else {
+        ncol = d3.color(settings.node_clusters.default_color || "#8B8B8B")
       }
+
+      var radius = Math.max(settings.node_size * n.size, 2)
+
+      // Precompute the label
+      // var color = options.colored_labels ? tuneColorForLabel(ncol) : d3.color('#666')
+      var color = d3.color("#363835")
+      var fontSize = options.sized_labels
+        ? Math.floor(options.font_min_size + (n.size - label_nodeSizeExtent[0]) * (options.font_max_size - options.font_min_size) / (label_nodeSizeExtent[1] - label_nodeSizeExtent[0]))
+        : Math.floor(0.6 * options.font_min_size + 0.4 * options.font_max_size)
+
+      var sw = options.normalizeFontSize(fontSize)
+      if (!options.true_size) {
+        fontSize = sw[0]
+      }
+      var fontWeight = sw[1]
+      ctx.font = buildContextFontString(fontWeight, fontSize, options.font_family)
+
+      // Then, draw the label only if wanted
+      var labelCoordinates = {
+        x: nx + 0.6 * options.border_thickness + 1.05 * radius,
+        y: ny + 0.25 * fontSize
+      }
+
+      var label = truncateWithEllipsis(n.label.replace(/^https*:\/\/(www\.)*/gi, ''), settings.label_max_length)
+
+
+      // Add to draw pipe
+      var l = {
+        label: label,
+        x: labelCoordinates.x,
+        y: labelCoordinates.y,
+        font: ctx.font,
+        color: color
+      }
+      labelsStack.push(l)
     })
 
     // Draw borders
-    labelsToDraw.forEach(function(l){
+    labelsStack.forEach(function(l){
       ctx.font = l.font
       ctx.lineWidth = options.border_thickness
       ctx.fillStyle = options.border_color
@@ -1383,7 +1460,7 @@ function drawNodeLabelsLayer(ctx, nodesBySize_) {
     })
 
     // Draw text
-    labelsToDraw.forEach(function(l){
+    labelsStack.forEach(function(l){
       ctx.font = l.font
       ctx.lineWidth = options.border_thickness
       ctx.fillStyle = options.border_color
@@ -1755,18 +1832,19 @@ function getBBox(ctx, fontSize, labelCoordinates, label, factor, offset) {
 
 function downloadImageData(imgd, name) {
   // New Canvas
-  var newCanvas = createCanvas()
-  newCanvas.width = imgd.width
-  newCanvas.height = imgd.height
+  var newCanvas = createCanvas(imgd.width, imgd.height)
   var ctx = newCanvas.getContext("2d")
 
   // Paint imgd
   ctx.putImageData(imgd, 0, 0)
 
   // Save
-  newCanvas.toBlob(function(blob) {
-    saveAs(blob, name + ".png");
-  })
+  const out = fs.createWriteStream(__dirname + '/data/'+name+'.png')
+	const stream = newCanvas.createPNGStream()
+	stream.pipe(out)
+  // newCanvas.toBlob(function(blob) {
+  //   saveAs(blob, name + ".png");
+  // })
 }
 
 function buildContextFontString(fontWeight, fontSize, fontFamily) {
@@ -1804,7 +1882,14 @@ function buildContextFontString(fontWeight, fontSize, fontFamily) {
 			weightSuffix = " Black"
 			break
 	}
+	// Normalize font size
+	fontSize = Math.floor(1000 * fontSize)/1000
 	return fontSize + "px " + fontFamily + weightSuffix
+}
+
+function truncateWithEllipsis(string, n){
+	if (n && n<Infinity)	return string.substr(0,n-1)+(string.length>n?'…':'');
+	return string
 }
 
 //// LOG
