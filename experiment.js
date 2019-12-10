@@ -34,14 +34,14 @@ var settings = {}
 settings.save_at_the_end = true
 
 // Image size and resolution
-settings.dpi = 72 // Dots per inch. Default=72 HighRes=300 PhotoPrint=1440
+settings.dpi = 300 // Dots per inch. Default=72 HighRes=300 PhotoPrint=1440
 settings.image_size = 100 // Image width in centimeters
-settings.tile_factor = 1 // Integer, default 1. Number of rows and columns of the grid of exported images.
+settings.tile_factor = 2 // Integer, default 1. Number of rows and columns of the grid of exported images.
 settings.width =  100 * Math.floor(settings.image_size * cm2inch * settings.dpi / settings.tile_factor / 100) // tile size, in pixels
 settings.height = 100 * Math.floor(settings.image_size * cm2inch * settings.dpi / settings.tile_factor / 100) // tile size, in pixels
 
 // Reference pen size (determines many line thicknesses)
-settings.pen_size = 0.5
+settings.pen_size = 0.05 * settings.tile_factor
 
 // Zoom:
 // You can zoon on a given point of the network
@@ -58,7 +58,7 @@ settings.zoom_point = {x:0.6, y:0.5} // range from 0 to 1
 settings.draw_background = true
 settings.draw_network_shape_fill = false
 settings.draw_network_shape_contour = false
-settings.draw_cluster_fills = false
+settings.draw_cluster_fills = true
 settings.draw_cluster_contours = false
 settings.draw_edges = true
 settings.draw_nodes = true
@@ -111,9 +111,9 @@ settings.node_size = 0.8 // Factor to adjust the nodes drawing size
 // Layer: Node labels
 settings.label_max_length = 64 // Number of characters before truncate. Infinity is a valid value.
 settings.label_font_min_size = 5 // in pt based on set dpi
-settings.label_font_max_size = 16  // in pt based on set dpi
-settings.label_font_thickness = 1 * settings.pen_size
-settings.label_border_thickness = 5 * settings.pen_size
+settings.label_font_max_size = 24  // in pt based on set dpi
+settings.label_font_thickness = 2.5 * settings.pen_size
+settings.label_border_thickness = 10 * settings.pen_size
 
 // Main clusters and color code:
 // Clusters are defined by the modalities of a given attribute.
@@ -165,6 +165,7 @@ settings.label_collision_size = 2500 // Canvas size for label collision detectio
 
 /// INIT
 report("Initialization")
+report("  > we will build "+(settings.tile_factor*settings.tile_factor)+" tiles of "+settings.width+" x "+settings.height+" pixels")
 
 // Fix missing coordinates and/or colors:
 //  some parts of the script require default values
@@ -1181,8 +1182,8 @@ function getNodeLabelSharedOptions(){
   options.colored_labels = true
   options.sized_labels = true
   options.true_size = false // false: size adjusted to the right thickness (weight)
-  options.label_spacing_factor = 3 // 1=normal; 2=box twice as wide/high etc.
-  options.label_spacing_offset = 2 * Math.min(settings.width, settings.height)/1000
+  options.label_spacing_factor = 2.2 // 1=normal; 2=box twice as wide/high etc.
+  options.label_spacing_offset = 1.7 * Math.min(settings.width, settings.height)/1000
   options.font_family = 'Raleway'
   options.font_min_size = settings.label_font_min_size * settings.dpi / 72
   options.font_max_size = settings.label_font_max_size * settings.dpi / 72
@@ -1282,7 +1283,7 @@ function precomputeVisibleLabels(nodesBySize_) {
         ? Math.floor(options.font_min_size + (options.ratio * n.size - label_nodeSizeExtent[0]) * (options.font_max_size - options.font_min_size) / (label_nodeSizeExtent[1] - label_nodeSizeExtent[0]))
         : Math.floor(0.6 * options.font_min_size + 0.4 * options.font_max_size)
 
-      var sw = options.normalizeFontSize(fontSize)
+      var sw = options.normalizeFontSize(options.ratio * fontSize / settings.tile_factor)
       if (!options.true_size) {
         fontSize = sw[0]
       }
@@ -1298,7 +1299,7 @@ function precomputeVisibleLabels(nodesBySize_) {
       var label = truncateWithEllipsis(n.label.replace(/^https*:\/\/(www\.)*/gi, ''), settings.label_max_length)
 
       // Bounding box
-      var bbox = getBBox(ctx, fontSize, labelCoordinates, label, options.label_spacing_factor, options.label_spacing_offset)
+      var bbox = getBBox(ctx, fontSize, labelCoordinates, label, options.label_spacing_factor, options.ratio * options.label_spacing_offset)
 
       // Test bounding box collision
       var collision = false
@@ -1349,7 +1350,7 @@ function precomputeVisibleLabels(nodesBySize_) {
 
   if (options.download_image) {
   	var imgd = ctx.getImageData(0, 0, options.width, options.height)
-  	downloadImageData(imgd, 'Monitoring labels')
+  	downloadImageData(imgd, 'Labels monitoring')
   }
   
 
