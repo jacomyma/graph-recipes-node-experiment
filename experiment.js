@@ -8,7 +8,7 @@ const d3 = require('d3')
 // Read file
 var gexf_string;
 try {
-    gexf_string = fs.readFileSync('data/test_small.gexf', 'utf8');
+    gexf_string = fs.readFileSync('data/test.gexf', 'utf8');
     console.log('GEXF file loaded');    
 } catch(e) {
     console.log('Error:', e.stack);
@@ -18,6 +18,7 @@ try {
 var g = gexf.parse(Graph, gexf_string);
 console.log('GEXF parsed');
 
+const cm2inch = 0.393701
 
 // MAKE A MAP
 //
@@ -33,9 +34,11 @@ var settings = {}
 settings.save_at_the_end = true
 
 // Image size and resolution
-settings.width =  5000 // in pixels
-settings.height = 5000 // in pixels
+settings.dpi = 72 // Dots per inch. Default=72 HighRes=300 PhotoPrint=1440
+settings.image_size = 100 // Image width in centimeters
 settings.tile_factor = 1 // Integer, default 1. Number of rows and columns of the grid of exported images.
+settings.width =  100 * Math.floor(settings.image_size * cm2inch * settings.dpi / settings.tile_factor / 100) // tile size, in pixels
+settings.height = 100 * Math.floor(settings.image_size * cm2inch * settings.dpi / settings.tile_factor / 100) // tile size, in pixels
 
 // Reference pen size (determines many line thicknesses)
 settings.pen_size = 0.5
@@ -57,7 +60,7 @@ settings.draw_network_shape_fill = false
 settings.draw_network_shape_contour = false
 settings.draw_cluster_fills = false
 settings.draw_cluster_contours = false
-settings.draw_edges = false
+settings.draw_edges = true
 settings.draw_nodes = true
 settings.draw_node_labels = true
 
@@ -107,9 +110,9 @@ settings.node_size = 0.8 // Factor to adjust the nodes drawing size
 
 // Layer: Node labels
 settings.label_max_length = 64 // Number of characters before truncate. Infinity is a valid value.
-settings.label_font_min_size = 12 // in pt based on 1MP 72dpi
-settings.label_font_max_size = 60  // in pt based on 1MP 72dpi
-settings.label_font_thickness = 3 * settings.pen_size
+settings.label_font_min_size = 5 // in pt based on set dpi
+settings.label_font_max_size = 16  // in pt based on set dpi
+settings.label_font_thickness = 1 * settings.pen_size
 settings.label_border_thickness = 5 * settings.pen_size
 
 // Main clusters and color code:
@@ -1177,12 +1180,12 @@ function getNodeLabelSharedOptions(){
   options.label_count = Infinity
   options.colored_labels = true
   options.sized_labels = true
-  options.true_size = true // false: size adjusted to the right thickness (weight)
+  options.true_size = false // false: size adjusted to the right thickness (weight)
   options.label_spacing_factor = 3 // 1=normal; 2=box twice as wide/high etc.
   options.label_spacing_offset = 2 * Math.min(settings.width, settings.height)/1000
   options.font_family = 'Raleway'
-  options.font_min_size = settings.label_font_min_size * Math.min(settings.width, settings.height)/1000
-  options.font_max_size = settings.label_font_max_size * Math.min(settings.width, settings.height)/1000
+  options.font_min_size = settings.label_font_min_size * settings.dpi / 72
+  options.font_max_size = settings.label_font_max_size * settings.dpi / 72
   options.font_thickness_optical_correction = 0.9
   options.text_thickness = settings.label_font_thickness * Math.min(settings.width, settings.height)/1000
   options.border_thickness = settings.label_border_thickness * Math.min(settings.width, settings.height)/1000
