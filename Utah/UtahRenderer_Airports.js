@@ -38,8 +38,8 @@ settings.rendering_dpi = 300 // Default: same as output_dpi. You can over- or un
 // Tiling:
 // Tiling allows to build images that would be otherwise too large.
 // You will have to assemble them by yourself.
-settings.tile_factor = 3 // Integer, default 1. Number of rows and columns of the grid of exported images.
-settings.tile_to_render = [1, 1] // Grid coordinates, as integers
+settings.tile_factor = 1 // Integer, default 1. Number of rows and columns of the grid of exported images.
+settings.tile_to_render = [0, 0] // Grid coordinates, as integers
 
 // Orientation & layout:
 settings.flip_x = true
@@ -61,9 +61,9 @@ settings.draw_cluster_contours = false
 settings.draw_cluster_labels = false
 settings.draw_edges = true
 settings.draw_nodes = true
-settings.draw_node_labels = true
+settings.draw_node_labels = false
 settings.draw_hillshading = true
-settings.draw_connected_closeness = true
+settings.draw_connected_closeness = false
 
 // Misc.
 settings.pen_size = 0.08 // Manga frame line: 0.5; Thinnest draw pen: 0.03
@@ -577,10 +577,10 @@ newRenderer = function(){
     var ctx = ns.createCanvas().getContext("2d")
     ns.scaleContext(ctx)
 
-    /// Unpack heatmap data
+    /// Unpack hillshading data
     var shadingData = ns.getHillshadingData()
     
-    // Unpack heatmap
+    // Unpack hillshading
     var ratio = 1/shadingData.ratio
     var lPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
     var dxPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
@@ -916,7 +916,7 @@ newRenderer = function(){
     } else {
       ns.log2("Draw hillshade...")
       var color = d3.color(options.hillshading_color)
-      let hmData = new Uint8ClampedArray(dim.w * dim.h * 4)
+      let hsData = new Uint8ClampedArray(dim.w * dim.h * 4)
       let xOffset = -dim.w*ns.settings.tile_to_render[0]
       let yOffset = -dim.h*ns.settings.tile_to_render[1]
       lPixelMap.forEach((l,i) => {
@@ -926,14 +926,14 @@ newRenderer = function(){
         let Y = y + yOffset
         if (0 <= X && X <= dim.w && 0 <= Y && Y <= dim.h) {
           let I = X + Y*dim.w
-          hmData[4*I  ] = color.r
-          hmData[4*I+1] = color.g
-          hmData[4*I+2] = color.b
-          hmData[4*I+3] = Math.floor(255*(1-l))
+          hsData[4*I  ] = color.r
+          hsData[4*I+1] = color.g
+          hsData[4*I+2] = color.b
+          hsData[4*I+3] = Math.floor(255*(1-l))
         }
       })
-      let hmImgd = new ImageData(hmData, dim.w, dim.h)
-      ctx.putImageData(hmImgd,0, 0)
+      let hsImgd = new ImageData(hsData, dim.w, dim.h)
+      ctx.putImageData(hsImgd,0, 0)
       ns.report2("...done.")
     }
 
@@ -2242,11 +2242,12 @@ newRenderer = function(){
      
     var options = options || {}
     options.max_edge_count = (options.max_edge_count === undefined)?(Infinity):(options.max_edge_count) // for monitoring only
-    options.pen_size = options.pen_size || .2 // In mm
+    options.pen_size = options.pen_size || .2 // in mm
     options.edge_alpha = (options.edge_alpha===undefined)?(1):(options.edge_alpha) // from 0 to 1
     options.edge_color = options.edge_color || "#303040"
     options.edge_high_quality = options.edge_high_quality || false
-    options.jitter = (options.jitter === undefined)?(0.01):(options.jitter) // In mm
+    options.edge_path_jitter = (options.edge_path_jitter === undefined)?(0.01):(options.edge_path_jitter) // in mm
+    options.edge_path_segment_length = options.edge_high_quality?.2:2 // in mm
     // Monitoring options
     options.display_voronoi = false // for monitoring purpose
     options.display_edges = true // disable for monitoring purpose
@@ -2350,7 +2351,7 @@ newRenderer = function(){
     // Draw each edge
     var color = d3.color(options.edge_color)
     var thickness = ns.mm_to_px(options.pen_size)
-    var jitter = ns.mm_to_px(options.jitter)
+    var jitter = ns.mm_to_px(options.edge_path_jitter)
     var tf = ns.settings.tile_factor
     if (options.display_edges) {
       ctx.lineCap="round"
@@ -2362,20 +2363,38 @@ newRenderer = function(){
           if ((i_+1)%10000 == 0) {
             console.log("..."+(i_+1)/1000+"K edges drawn...")
           }
-          var ns = g.getNodeAttributes(g.source(eid))
-          var nt = g.getNodeAttributes(g.target(eid))
-          var path, i, x, y, o, dpixi, lastdpixi, lasto, pixi, pi=0
+          var n_s = g.getNodeAttributes(g.source(eid))
+          var n_t = g.getNodeAttributes(g.target(eid))
+          var path, i, x, y, o, dpixi, lastdpixi, lasto, pixi, pi
 
+          // Build path
+          var d = Math.sqrt(Math.pow(n_s.x - n_t.x, 2) + Math.pow(n_s.y - n_t.y, 2))
+          var iPixStep = ns.mm_to_px(options.edge_path_segment_length)
+          var segCount = Math.ceil(d/iPixStep)
+          pi = 0
+          path = new Int32Array(3*segCount)
+          for (i=0; i<1; i+=iPixStep/d) {
+            x = (1-i)*n_s.x + i*n_t.x
+            y = (1-i)*n_s.y + i*n_t.y
+
+            path[pi  ] = x*tf
+            path[pi+1] = y*tf
+            path[pi+2] = 255
+            pi +=3
+          }
+          path[3*(segCount-1)  ] = n_t.x*tf
+          path[3*(segCount-1)+1] = n_t.y*tf
+          path[3*(segCount-1)+2] = 255
+
+          // Modify path
+
+
+          // Compute path opacity
           if (options.edge_high_quality) {
-            var d = Math.sqrt(Math.pow(ns.x - nt.x, 2) + Math.pow(ns.y - nt.y, 2))
-
-            // Build path
-            var iPixStep = 2.5/tf
-            var l = Math.ceil(d/iPixStep)
-            path = new Int32Array(3*l)
-            for (i=0; i<1; i+=iPixStep/d) {
-              x = (1-i)*ns.x + i*nt.x
-              y = (1-i)*ns.y + i*nt.y
+            lastdpixi = undefined
+            for (pi=0; pi<path.length; pi+=3) {
+              x = path[pi  ] / tf
+              y = path[pi+1] / tf
 
               // Opacity
               pixi = Math.floor(x*tf) + dim.w * tf * Math.floor(y*tf)
@@ -2387,42 +2406,26 @@ newRenderer = function(){
                   o = 0
                 }
               } else {
-                if (vidPixelMap_u[pixi] == ns.vid || vidPixelMap_u[pixi] == nt.vid) {
+                if (vidPixelMap_u[pixi] == n_s.vid || vidPixelMap_u[pixi] == n_t.vid) {
                   o = 1
                 } else {
                   o = gradient(dpixi/255)
                 }
                 if (lastdpixi === undefined && pi>3) {
                   path[(pi-3)+2] = Math.round(o*255)
-                } 
+                }
               }
+              path[pi+2] = Math.round(o*255)
               lastdpixi = dpixi
               lasto = o
-
-              path[pi  ] = x*tf
-              path[pi+1] = y*tf
-              path[pi+2] = Math.round(o*255)
-              pi +=3
-              lasto = o
             }
-            path[3*(l-1)  ] = nt.x*tf
-            path[3*(l-1)+1] = nt.y*tf
-            path[3*(l-1)+2] = 255
 
-            // Smoothe path
+            // Smoothe path opacity
             if (path.length > 5) {
-              for (i=2; i<path.length-2; i++) {
+              for (i=2; i<path.length/3-2; i++) {
                 path[i*3+2] = 0.15 * path[(i-2)*3+2] + 0.25 * path[(i-1)*3+2] + 0.2 * path[i*3+2] + 0.25 * path[(i+1)*3+2] + 0.15 * path[(i+2)*3+2]
               }
             }
-          } else {
-            path = new Int16Array(6)
-            path[0] = ns.x*tf
-            path[1] = ns.y*tf
-            path[2] = 255
-            path[3] = nt.x*tf
-            path[4] = nt.y*tf
-            path[5] = 255
           }
           
           // Draw path
@@ -2434,9 +2437,6 @@ newRenderer = function(){
 
             // Collapse opacity
             o = (Math.random()<=o) ? (1) : (0)
-
-            // Recaliber for lighter line
-            // o *= 0.3 + 0.2*Math.random()
 
             if (lastx) {
               ctx.lineWidth = thickness * (0.9 + 0.2*Math.random())
@@ -2464,15 +2464,16 @@ newRenderer = function(){
   }
 
   ns.drawEdgesExperimentLayer = function(options) {
-    ns.log("Draw edges...")
+    ns.log("Draw edges EXPERIMENTAL...")
      
     var options = options || {}
     options.max_edge_count = (options.max_edge_count === undefined)?(Infinity):(options.max_edge_count) // for monitoring only
-    options.pen_size = options.pen_size || .2 // In mm
+    options.pen_size = options.pen_size || .2 // in mm
     options.edge_alpha = (options.edge_alpha===undefined)?(1):(options.edge_alpha) // from 0 to 1
     options.edge_color = options.edge_color || "#303040"
-    options.edge_high_quality = options.edge_high_quality || false
-    options.jitter = (options.jitter === undefined)?(0.01):(options.jitter) // In mm
+    options.edge_high_quality = true//options.edge_high_quality || false
+    options.edge_path_jitter = 0//(options.edge_path_jitter === undefined)?(0.01):(options.edge_path_jitter) // in mm
+    options.edge_path_segment_length = options.edge_high_quality?.2:2 // in mm
     // Monitoring options
     options.display_voronoi = false // for monitoring purpose
     options.display_edges = true // disable for monitoring purpose
@@ -2573,35 +2574,168 @@ newRenderer = function(){
       ns.report2("...done.")
     }
 
+    // Hillshading data
+    var shadingData = ns.getHillshadingData()
+
+    // Unpack hillshading
+    var ratio = 1/shadingData.ratio
+    var lPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
+    var dxPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
+    var dyPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
+    var xu, yu, xp, xp1, xp2, dx, yp, yp1, yp2, dy, ip_top_left, ip_top_right, ip_bottom_left, ip_bottom_right
+    for (var i=0; i<lPixelMap.length; i++) {
+      // unpacked coordinates
+      xu = i%(dim.w * ns.settings.tile_factor)
+      yu = (i-xu)/(dim.w * ns.settings.tile_factor)
+      // packed coordinates
+      xp = xu/ratio
+      xp1 = Math.max(0, Math.min(shadingData.width, Math.floor(xp)))
+      xp2 = Math.max(0, Math.min(shadingData.width, Math.ceil(xp)))
+      dx = (xp-xp1)/(xp2-xp1) || 0
+      yp = yu/ratio
+      yp1 = Math.max(0, Math.min(shadingData.height, Math.floor(yp)))
+      yp2 = Math.max(0, Math.min(shadingData.height, Math.ceil(yp)))
+      dy = (yp-yp1)/(yp2-yp1) || 0
+      // coordinates of the 4 pixels necessary to rescale
+      ip_top_left = xp1 + (shadingData.width+1) * yp1
+      ip_top_right = xp2 + (shadingData.width+1) * yp1
+      ip_bottom_left = xp1 + (shadingData.width+1) * yp2
+      ip_bottom_right = xp2 + (shadingData.width+1) * yp2
+      // Rescaling (gradual blending between the 4 pixels)
+      lPixelMap[i] =
+          (1-dx) * (
+            (1-dy) * shadingData.lPixelMap[ip_top_left]
+            +  dy  * shadingData.lPixelMap[ip_bottom_left]
+          )
+        + dx * (
+            (1-dy) * shadingData.lPixelMap[ip_top_right]
+            +  dy  * shadingData.lPixelMap[ip_bottom_right]
+          )
+      dxPixelMap[i] =
+          (1-dx) * (
+            (1-dy) * shadingData.dxPixelMap[ip_top_left]
+            +  dy  * shadingData.dxPixelMap[ip_bottom_left]
+          )
+        + dx * (
+            (1-dy) * shadingData.dxPixelMap[ip_top_right]
+            +  dy  * shadingData.dxPixelMap[ip_bottom_right]
+          )
+      dyPixelMap[i] =
+          (1-dx) * (
+            (1-dy) * shadingData.dyPixelMap[ip_top_left]
+            +  dy  * shadingData.dyPixelMap[ip_bottom_left]
+          )
+        + dx * (
+            (1-dy) * shadingData.dyPixelMap[ip_top_right]
+            +  dy  * shadingData.dyPixelMap[ip_bottom_right]
+          )
+    }
+
     // Draw each edge
     var color = d3.color(options.edge_color)
     var thickness = ns.mm_to_px(options.pen_size)
-    var jitter = ns.mm_to_px(options.jitter)
+    var jitter = ns.mm_to_px(options.edge_path_jitter)
     var tf = ns.settings.tile_factor
     if (options.display_edges) {
       ctx.lineCap="round"
       ctx.lineJoin="round"
       ctx.fillStyle = 'rgba(0, 0, 0, 0)';
       g.edges()
+        //.filter(function(eid, i_){ return i_ == 181 })
         .filter(function(eid, i_){ return i_ < options.max_edge_count })
         .forEach(function(eid, i_){
           if ((i_+1)%10000 == 0) {
             console.log("..."+(i_+1)/1000+"K edges drawn...")
           }
-          var ns = g.getNodeAttributes(g.source(eid))
-          var nt = g.getNodeAttributes(g.target(eid))
-          var path, i, x, y, o, dpixi, lastdpixi, lasto, pixi, pi=0
+          var n_s = g.getNodeAttributes(g.source(eid))
+          var n_t = g.getNodeAttributes(g.target(eid))
+          var path, i, x, y, o, dpixi, lastdpixi, lasto, pixi, pi
 
+          // Build path
+          var d = Math.sqrt(Math.pow(n_s.x - n_t.x, 2) + Math.pow(n_s.y - n_t.y, 2))
+          var iPixStep = ns.mm_to_px(options.edge_path_segment_length)
+          var segCount = Math.ceil(d/iPixStep)
+          pi = 0
+          path = new Float32Array(3*segCount)
+          for (i=0; i<1; i+=iPixStep/d) {
+            x = (1-i)*n_s.x + i*n_t.x
+            y = (1-i)*n_s.y + i*n_t.y
+            path[pi  ] = x*tf
+            path[pi+1] = y*tf
+            path[pi+2] = 255
+            pi +=3
+          }
+          path[3*(segCount-1)  ] = n_t.x*tf
+          path[3*(segCount-1)+1] = n_t.y*tf
+          path[3*(segCount-1)+2] = 255
+
+          // Modify path
+          var str = 200
+          var hooke = .01
+          var dMax = 20
+          var loops = 100
+          while (loops-->0) {
+            var dpath = new Float32Array(3*segCount)
+            if (path.length > 3 * 5) {
+              var lastx = path[0] / tf
+              var lasty = path[1] / tf
+              x = path[3] / tf
+              y = path[4] / tf
+              var nextx = path[6] / tf
+              var nexty = path[7] / tf
+              for (pi=3; pi<path.length-3; pi+=3) {
+                let i = Math.floor(Math.floor(x) + Math.floor(y)*dim.w*tf)
+                let heatmap_dx = str*dxPixelMap[i]
+                let heatmap_dy = str*dyPixelMap[i]
+                let dlast = -hooke * Math.sqrt(Math.pow(x-lastx,2)+Math.pow(y-lasty,2))
+                let last_dx = dlast * (x-lastx)
+                let last_dy = dlast * (y-lasty)
+                let dnext = -hooke * Math.sqrt(Math.pow(x-nextx,2)+Math.pow(y-nexty,2))
+                let next_dx = dnext * (x-nextx)
+                let next_dy = dnext * (y-nexty)
+                let dx = heatmap_dx + last_dx + next_dx
+                let dy = heatmap_dy + last_dy + next_dy
+                let dd = Math.sqrt(dx*dx+dy*dy)
+                let dratio = Math.min(1, dMax/dd)
+                dpath[pi  ] = dratio * dx
+                dpath[pi+1] = dratio * dy
+
+                /*ctx.lineWidth = 2
+                ctx.strokeStyle = "rgba(0,0,255,0.3)"
+                ctx.beginPath()
+                ctx.moveTo(x, y)
+                ctx.lineTo(x+dpath[pi  ], y+dpath[pi+1])
+                ctx.stroke()*/
+
+                lastx = x
+                lasty = y
+                x = nextx
+                y = nexty
+                nextx = path[pi+6] / tf
+                nexty = path[pi+7] / tf
+
+              }
+              for (pi=3; pi<path.length-3; pi+=3) {
+                x = path[pi  ] / tf + dpath[pi  ]
+                y = path[pi+1] / tf + dpath[pi+1]
+                path[pi  ] = tf * x
+                path[pi+1] = tf * y
+                /*
+                ctx.beginPath()
+                ctx.arc(x, y, 2, 0, 2 * Math.PI);
+                ctx.fillStyle = "#F00"
+                ctx.fill();
+                */
+              }
+            }
+          }
+
+          // Compute path opacity
           if (options.edge_high_quality) {
-            var d = Math.sqrt(Math.pow(ns.x - nt.x, 2) + Math.pow(ns.y - nt.y, 2))
-
-            // Build path
-            var iPixStep = 2.5/tf
-            var l = Math.ceil(d/iPixStep)
-            path = new Int32Array(3*l)
-            for (i=0; i<1; i+=iPixStep/d) {
-              x = (1-i)*ns.x + i*nt.x
-              y = (1-i)*ns.y + i*nt.y
+            lastdpixi = undefined
+            for (pi=0; pi<path.length; pi+=3) {
+              x = path[pi  ] / tf
+              y = path[pi+1] / tf
 
               // Opacity
               pixi = Math.floor(x*tf) + dim.w * tf * Math.floor(y*tf)
@@ -2613,46 +2747,30 @@ newRenderer = function(){
                   o = 0
                 }
               } else {
-                if (vidPixelMap_u[pixi] == ns.vid || vidPixelMap_u[pixi] == nt.vid) {
+                if (vidPixelMap_u[pixi] == n_s.vid || vidPixelMap_u[pixi] == n_t.vid) {
                   o = 1
                 } else {
                   o = gradient(dpixi/255)
                 }
                 if (lastdpixi === undefined && pi>3) {
                   path[(pi-3)+2] = Math.round(o*255)
-                } 
+                }
               }
+              path[pi+2] = Math.round(o*255)
               lastdpixi = dpixi
               lasto = o
-
-              path[pi  ] = x*tf
-              path[pi+1] = y*tf
-              path[pi+2] = Math.round(o*255)
-              pi +=3
-              lasto = o
             }
-            path[3*(l-1)  ] = nt.x*tf
-            path[3*(l-1)+1] = nt.y*tf
-            path[3*(l-1)+2] = 255
 
-            // Smoothe path
+            // Smoothe path opacity
             if (path.length > 5) {
-              for (i=2; i<path.length-2; i++) {
+              for (i=2; i<path.length/3-2; i++) {
                 path[i*3+2] = 0.15 * path[(i-2)*3+2] + 0.25 * path[(i-1)*3+2] + 0.2 * path[i*3+2] + 0.25 * path[(i+1)*3+2] + 0.15 * path[(i+2)*3+2]
               }
             }
-          } else {
-            path = new Int16Array(6)
-            path[0] = ns.x*tf
-            path[1] = ns.y*tf
-            path[2] = 255
-            path[3] = nt.x*tf
-            path[4] = nt.y*tf
-            path[5] = 255
           }
           
           // Draw path
-          var x, y, o, lastx, lasty, lasto
+          var x, y, o, lastx = undefined, lasty = undefined, lasto
           for (i=0; i<path.length; i+=3) {
             x = Math.floor( 1000 * (path[i]/tf + jitter * (0.5 - Math.random())) ) / 1000
             y = Math.floor( 1000 * (path[i+1]/tf + jitter * (0.5 - Math.random())) ) / 1000
@@ -2660,9 +2778,6 @@ newRenderer = function(){
 
             // Collapse opacity
             o = (Math.random()<=o) ? (1) : (0)
-
-            // Recaliber for lighter line
-            // o *= 0.3 + 0.2*Math.random()
 
             if (lastx) {
               ctx.lineWidth = thickness * (0.9 + 0.2*Math.random())
@@ -3546,5 +3661,5 @@ newRenderer = function(){
 
 /// FINALLY, RENDER
 let renderer = newRenderer()
-//renderer.renderAndSave(g, settings)
-renderer.renderAndSaveAllTiles(g, settings)
+renderer.renderAndSave(g, settings)
+//renderer.renderAndSaveAllTiles(g, settings)
