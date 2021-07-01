@@ -57,8 +57,8 @@ settings.draw_background = true
 settings.draw_network_shape_fill = false
 settings.draw_network_shape_contour = false
 settings.draw_cluster_fills = true
-settings.draw_cluster_contours = false
-settings.draw_cluster_labels = false
+settings.draw_cluster_contours = true
+settings.draw_cluster_labels = true
 settings.draw_edges = true
 settings.draw_nodes = true
 settings.draw_node_labels = true
@@ -112,8 +112,8 @@ settings.cluster_label_colored = true
 settings.cluster_label_font_min_size = 14 // In pt
 settings.cluster_label_font_max_size = 24 // In pt
 settings.cluster_label_font_thickness = .45 // In mm
-settings.cluster_label_border_thickness = 2 // In mm
-settings.cluster_label_inner_color = "#FFF" // Note: here color is on the border
+settings.cluster_label_border_thickness = 1.6 // In mm
+settings.cluster_label_inner_color = "#ffffff" // Note: here color is on the border
 
 // Layer: Edges
 settings.edge_alpha = 1 // Opacity // Range from 0 to 1
@@ -148,32 +148,42 @@ settings.node_clusters = {
   "attribute_id": "modularity_class",
   "modalities": {
     "1": {
-      "label": "1",
+      "label": "Sex",
       "count": 146,
       "color": "#5ba5b8"
     },
     "2": {
-      "label": "2",
+      "label": "Family",
       "count": 85,
       "color": "#d4677e"
     },
     "6": {
-      "label": "6",
+      "label": "Illness",
       "count": 156,
       "color": "#66b456"
     },
     "7": {
-      "label": "7",
+      "label": "Domination",
       "count": 79,
       "color": "#f9aa26"
     },
     "8": {
-      "label": "8",
+      "label": "Culture",
       "count": 174,
       "color": "#f6522b"
-    }
+    },
+    "5": {
+      "label": "Feelings",
+      "count": 77,
+      "color": "#5e676e"
+    },
+    "4": {
+      "label": "Work",
+      "count": 75,
+      "color": "#5e676e"
+    },
   },
-  "default_color": "#e9bfa6"
+  "default_color": "#5e676e"
 }
 
 // Advanced settings
@@ -1467,9 +1477,8 @@ newRenderer = function(){
     labelsStack.forEach(function(l){
       ctx.font = l.font
       ctx.lineWidth = borderThickness
-      ctx.fillStyle = l.color
-      ctx.strokeStyle = l.color
-
+      ctx.fillStyle = l.color.toString()
+      ctx.strokeStyle = l.color.toString()
       ctx.fillText(
         l.label
       , l.x
