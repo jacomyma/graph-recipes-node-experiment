@@ -45,10 +45,10 @@ settings.tile_to_render = [0, 0] // Grid coordinates, as integers
 settings.flip_x = false
 settings.flip_y = true
 settings.rotate = 0 // In degrees, clockwise
-settings.margin_top    = 18 // in mm
-settings.margin_right  = 54 // in mm
-settings.margin_bottom = 30 // in mm
-settings.margin_left   = 18 // in mm
+settings.margin_top    =  6 // in mm
+settings.margin_right  =  6 // in mm
+settings.margin_bottom = 12 // in mm
+settings.margin_left   =  6 // in mm
 
 // Layers:
 // Decide which layers are drawn.
@@ -56,7 +56,7 @@ settings.margin_left   = 18 // in mm
 settings.draw_background = true
 settings.draw_network_shape_fill = false
 settings.draw_network_shape_contour = false
-settings.draw_cluster_fills = false
+settings.draw_cluster_fills = true
 settings.draw_cluster_contours = false
 settings.draw_cluster_labels = false
 settings.draw_edges = true
@@ -73,6 +73,7 @@ settings.cc_text_border_color = "#ffffff"
 settings.cc_font_size = 8 // in pt
 settings.cc_line_color = "#171637"
 settings.cc_grid_line_color = "#d5d3d7"
+settings.cc_info_margin_offset = 4.5 // In mm
 
 // Layer: Network shape
 //        (a potato for the whole network)
@@ -82,7 +83,7 @@ settings.network_shape_smoothness = 15 // In mm (underlying blur)
 settings.network_shape_swelling = 0.95 // Range: 0.01 to 0.99 // Balanced: 0.5 // Acts on size
 // ...shape fill
 settings.network_shape_fill_alpha = 0.2 // Opacity // Range from 0 to 1
-settings.network_shape_fill_color = "#FFF"
+settings.network_shape_fill_color = "#f4efec"
 // ...shape contour
 settings.network_shape_contour_thickness = 2 // Min: 1
 settings.network_shape_contour_alpha = 0.8 // Opacity // Range from 0 to 1
@@ -92,8 +93,9 @@ settings.network_shape_contour_color = "#FFF"
 //        (a potato per modality of target attribute)
 // ...generic structure
 settings.cluster_all_modalities = false // By default, we only use modalities specified in "node_clusters"
-settings.cluster_shape_smoothness = 15 // In mm (underlying blur)
-settings.cluster_shape_size = 3 // Range: more than 0, default to 1.
+settings.cluster_node_size_margin = 3 // In mm
+settings.cluster_shape_smoothness = 10 // In mm (underlying blur)
+settings.cluster_shape_size = 1 // Range: more than 0, default to 1.
 settings.cluster_shape_swelling = 0.75 // Range: 0.01 to 0.99 // Balanced: 0.5 // Acts on size
 // ...cluster fills
 settings.cluster_fill_alpha = 0.3 // Opacity // Range from 0 to 1
@@ -115,12 +117,14 @@ settings.cluster_label_inner_color = "#FFF" // Note: here color is on the border
 
 // Layer: Edges
 settings.edge_alpha = 1 // Opacity // Range from 0 to 1
-settings.edge_high_quality = true // Halo around nodes // Time-consuming
+settings.edge_curved = true
+settings.edge_high_quality = false // Halo around nodes // Time-consuming
 settings.edge_color = "#b6b8c4"
 
 // Layer: Nodes
 settings.adjust_voronoi_range = 100 // Factor // Larger node halo
 settings.node_size = 0.8 // Factor to adjust the nodes drawing size
+settings.node_color_original = false // Use the original node color
 settings.node_stroke_color = "#171637"
 settings.node_fill_color = "#171637"
 
@@ -140,7 +144,37 @@ settings.label_border_color = settings.background_color
 // This specifies which is this attribute, and which
 // modalities have which colors. You can generate this
 // JSON object with the PREPARE script.
-settings.node_clusters = {}
+settings.node_clusters = {
+  "attribute_id": "modularity_class",
+  "modalities": {
+    "1": {
+      "label": "1",
+      "count": 146,
+      "color": "#7c8f12"
+    },
+    "2": {
+      "label": "2",
+      "count": 85,
+      "color": "#3d803e"
+    },
+    "6": {
+      "label": "6",
+      "count": 156,
+      "color": "#9a6838"
+    },
+    "7": {
+      "label": "7",
+      "count": 79,
+      "color": "#40588e"
+    },
+    "8": {
+      "label": "8",
+      "count": 174,
+      "color": "#ac5b83"
+    }
+  },
+  "default_color": "#5f6f79"
+}
 
 // Advanced settings
 settings.voronoi_range = 4 // Halo size in mm
@@ -565,10 +599,10 @@ newRenderer = function(){
     var textThickness = ns.mm_to_px(options.cc_text_border_thickness);
     var lineThickness = ns.mm_to_px(options.cc_line_thickness);
     
-    var margin_bottom = ns.mm_to_px(options.margin_bottom + options.cc_info_margin_offset)
+    var margin_bottom = ns.mm_to_px(options.margin_bottom - options.cc_info_margin_offset)
     var margin_right  = ns.mm_to_px(options.margin_right + options.cc_info_margin_offset)
     var margin_left   = ns.mm_to_px(options.margin_left - options.cc_info_margin_offset)
-    var margin_top    = ns.mm_to_px(options.margin_top - options.cc_info_margin_offset)
+    var margin_top    = ns.mm_to_px(options.margin_top + options.cc_info_margin_offset)
     var centerPoint = {x: margin_left + (dim.w-margin_left-margin_right)/2, y:margin_top + (dim.h-margin_top-margin_bottom)/2}
     var southWestPoint = {x: margin_left, y:dim.h-margin_bottom}
     var westPoint = {x: southWestPoint.x, y: centerPoint.y}
@@ -814,10 +848,10 @@ newRenderer = function(){
     var ctx = ns.createCanvas().getContext("2d")
     ns.scaleContext(ctx)
     
-    var margin_bottom = ns.mm_to_px(options.margin_bottom + options.cc_info_margin_offset)
+    var margin_bottom = ns.mm_to_px(options.margin_bottom - options.cc_info_margin_offset)
     var margin_right  = ns.mm_to_px(options.margin_right + options.cc_info_margin_offset)
     var margin_left   = ns.mm_to_px(options.margin_left - options.cc_info_margin_offset)
-    var margin_top    = ns.mm_to_px(options.margin_top - options.cc_info_margin_offset)
+    var margin_top    = ns.mm_to_px(options.margin_top + options.cc_info_margin_offset)
     var centerPoint = {x: margin_left + (dim.w-margin_left-margin_right)/2, y:margin_top + (dim.h-margin_top-margin_bottom)/2}
 
     if (C_max >= options.C_max_threshold) {
@@ -914,7 +948,7 @@ newRenderer = function(){
 
     var options = {}
     options.resolution_max = 100000000 // 10 megapixel
-    options.node_size_margin = 10 // In mm 
+    options.node_size_margin = ns.settings.cluster_node_size_margin || 10 // In mm 
     options.node_size_factor = ns.settings.cluster_shape_size * ns.settings.node_size || 3 // above 0, default 1
     options.blur_radius = ns.settings.cluster_shape_smoothness || 5 // In mm
     options.gradient_threshold = 1-ns.settings.cluster_shape_swelling || 0.4
@@ -2224,6 +2258,7 @@ newRenderer = function(){
     options.node_size = options.node_size || 1
     options.node_stroke = (options.node_stroke===undefined)?(true):(options.node_stroke)
     options.node_stroke_width = options.node_stroke_width || 0.08 // in mm
+    options.node_color_original = (options.node_color_original===undefined)?(false):(options.node_color_original)
     options.node_fill_color = options.node_fill_color || "#FFF"
     options.node_stroke_color = options.node_stroke_color || "#303040"
     
@@ -2236,7 +2271,7 @@ newRenderer = function(){
     ns.getNodesBySize().forEach(function(nid){
       var n = g.getNodeAttributes(nid)
 
-      var color = options.node_fill_color
+      var color = options.node_color_original ? (n.color || options.node_fill_color) : options.node_fill_color
       var radius = Math.max(options.node_size * n.size, stroke_width)
 
       ctx.lineCap="round"
@@ -2431,12 +2466,12 @@ newRenderer = function(){
     options.flip_x = options.flip_x || false
     options.flip_y = options.flip_y || false
     options.rotate = options.rotate || 0
-    options.use_barycenter_ratio = options.use_barycenter_ratio = 0.5 // Between 0 and 1
+    options.use_barycenter_ratio = options.use_barycenter_ratio || .2 // Between 0 (center for borders) and 1 (center for mass)
     options.contain_in_inscribed_circle = options.contain_in_inscribed_circle || false
-    options.margin_bottom = (options.margin_bottom === undefined)?(24):(options.margin_bottom) // in mm, space for the text etc.
-    options.margin_right  = (options.margin_right  === undefined)?(12):(options.margin_right ) // in mm, space for the text etc.
-    options.margin_left   = (options.margin_left   === undefined)?(3 ):(options.margin_left  ) // in mm, space for the text etc.
-    options.margin_top    = (options.margin_top    === undefined)?(6 ):(options.margin_top   ) // in mm, space for the text etc.
+    options.margin_bottom = (options.margin_bottom === undefined)?( 6):(options.margin_bottom) // in mm, space for the text etc.
+    options.margin_right  = (options.margin_right  === undefined)?( 6):(options.margin_right ) // in mm, space for the text etc.
+    options.margin_left   = (options.margin_left   === undefined)?( 6):(options.margin_left  ) // in mm, space for the text etc.
+    options.margin_top    = (options.margin_top    === undefined)?( 6):(options.margin_top   ) // in mm, space for the text etc.
 
     var g = ns.g
     let dim = ns.getRenderingPixelDimensions()
