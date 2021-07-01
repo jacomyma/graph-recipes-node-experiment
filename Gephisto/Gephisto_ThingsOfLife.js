@@ -118,7 +118,7 @@ settings.cluster_label_inner_color = "#FFF" // Note: here color is on the border
 // Layer: Edges
 settings.edge_alpha = 1 // Opacity // Range from 0 to 1
 settings.edge_curved = true
-settings.edge_high_quality = false // Halo around nodes // Time-consuming
+settings.edge_high_quality = true // Halo around nodes // Time-consuming
 settings.edge_color = "#b6b8c4"
 
 // Layer: Nodes
@@ -150,30 +150,30 @@ settings.node_clusters = {
     "1": {
       "label": "1",
       "count": 146,
-      "color": "#7c8f12"
+      "color": "#5ba5b8"
     },
     "2": {
       "label": "2",
       "count": 85,
-      "color": "#3d803e"
+      "color": "#d4677e"
     },
     "6": {
       "label": "6",
       "count": 156,
-      "color": "#9a6838"
+      "color": "#66b456"
     },
     "7": {
       "label": "7",
       "count": 79,
-      "color": "#40588e"
+      "color": "#f9aa26"
     },
     "8": {
       "label": "8",
       "count": 174,
-      "color": "#ac5b83"
+      "color": "#f6522b"
     }
   },
-  "default_color": "#5f6f79"
+  "default_color": "#e9bfa6"
 }
 
 // Advanced settings
