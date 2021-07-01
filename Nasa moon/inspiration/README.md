@@ -1,0 +1,2 @@
+Source:
+https://www.davidrumsey.com/ll/thumbnailView.html?startUrl=%2F%2Fwww.davidrumsey.com%2Fluna%2Fservlet%2Fas%2Fsearch%3Fos%3D0%26lc%3DRUMSEY~8~1%26q%3Dpub_list_no%3D%2210888.000%22%26sort%3DPub_List_No_InitialSort%2CPub_Date%2CPub_List_No%2CSeries_No%26bs%3D10&s=03

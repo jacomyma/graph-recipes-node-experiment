@@ -30,25 +30,25 @@ console.log('GEXF parsed');
 var settings = {}
 
 // Image size and resolution
-settings.image_width = 1000 // in mm. Default: 20mm (fits in a A4 page)
+settings.image_width = 1000 // in mm. Default: 200mm (fits in a A4 page)
 settings.image_height = 1000
-settings.output_dpi = 300 // Dots per inch.
-settings.rendering_dpi = 300 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
+settings.output_dpi = 1440 // Dots per inch.
+settings.rendering_dpi = 1440 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
 
 // Tiling:
 // Tiling allows to build images that would be otherwise too large.
 // You will have to assemble them by yourself.
-settings.tile_factor = 1 // Integer, default 1. Number of rows and columns of the grid of exported images.
-settings.tile_to_render = [0, 0] // Grid coordinates, as integers
+settings.tile_factor = 3 // Integer, default 1. Number of rows and columns of the grid of exported images.
+settings.tile_to_render = [1, 1] // Grid coordinates, as integers
 
 // Orientation & layout:
 settings.flip_x = true
 settings.flip_y = true
 settings.rotate = 0 // In degrees, clockwise
-settings.margin_top    = 6 // in mm
-settings.margin_right  = 24 // in mm
-settings.margin_bottom = 12 // in mm
-settings.margin_left   =  6 // in mm
+settings.margin_top    = 18 // in mm
+settings.margin_right  = 54 // in mm
+settings.margin_bottom = 30 // in mm
+settings.margin_left   = 18 // in mm
 
 // Layers:
 // Decide which layers are drawn.
@@ -61,9 +61,9 @@ settings.draw_cluster_contours = false
 settings.draw_cluster_labels = false
 settings.draw_edges = true
 settings.draw_nodes = true
-settings.draw_node_labels = false
-settings.draw_hillshading = true
-settings.draw_connected_closeness = false
+settings.draw_node_labels = true
+settings.draw_hillshading = false
+settings.draw_connected_closeness = true
 
 // Misc.
 settings.pen_size = 0.08 // Manga frame line: 0.5; Thinnest draw pen: 0.03
@@ -250,6 +250,8 @@ settings.voronoi_range = 4 // Halo size in mm
 settings.voronoi_resolution_max = 1 * Math.pow(10, 7) // in pixel. 10^7 still quick, 10^8 better quality 
 settings.heatmap_resolution_max = 1 * Math.pow(10, 5) // in pixel. 10^5 quick. 10^7 nice but super slow.
 settings.heatmap_spreading = 10 // in mm
+
+// Experimental stuff
 settings.hillshading_strength = 80
 settings.hillshading_color = "#9d805c"
 settings.hillshading_alpha = .3 // Opacity
@@ -311,8 +313,8 @@ newRenderer = function(){
     // Draw edges
     if (ns.settings.draw_edges) {
       layeredImage = ns.drawLayerOnTop(layeredImage,
-        //ns.drawEdgesLayer(ns.settings)
-        ns.drawEdgesExperimentLayer(ns.settings)
+        ns.drawEdgesLayer(ns.settings)
+        //ns.drawEdgesExperimentLayer(ns.settings)
       )
     }
 
@@ -392,6 +394,7 @@ newRenderer = function(){
 
   // Render all tiles
   ns.renderAndSaveAllTiles = function(g, settings) {
+    console.log("Rendering all tiles.")
     if (settings === undefined || settings.tile_factor === undefined) {
       console.error("Tile factor not specified")
       return
@@ -990,17 +993,17 @@ newRenderer = function(){
 
       // Draw the scale
       drawScaleV(ctx, westPoint.x+lineThickness/2, westPoint.y, Delta_max);
-      drawText(ctx, 'Δ₊', westPoint.x+lineThickness/2 + ns.mm_to_px(.5) + textThickness, westPoint.y + 0.4*ns.pt_to_pt(options.cc_font_size), "start");
+      drawText(ctx, 'Δmax', westPoint.x+lineThickness/2 + ns.mm_to_px(.5) + textThickness, westPoint.y + 0.4*ns.pt_to_pt(options.cc_font_size), "start");
 
       drawScaleH(ctx, southPoint.x, southPoint.y-lineThickness/2, Delta_max);
-      drawText(ctx, 'Δ₊', southPoint.x, southPoint.y-lineThickness/2 - textThickness, "center");
+      drawText(ctx, 'Δmax', southPoint.x, southPoint.y-lineThickness/2 - textThickness, "center");
 
       drawText(
         ctx,
         Math.round(100*ccData.E_percent_of_Delta_max)
           +(options.cc_abridged
-            ? `% edges ≤ Δ₊`
-            : `% of connected nodes are Δ₊ or closer`
+            ? `% edges ≤ Δmax`
+            : `% of connected nodes are Δmax or closer`
           ),
         southPoint.x,
         southPoint.y + 1.5*lineHeight,
@@ -1020,8 +1023,8 @@ newRenderer = function(){
         ctx,
         (Math.round(100*ccData.E_percent_of_Delta_max) - Math.round(100*ccData.C_max))
           +(settings.cc_abridged
-            ? `% edges ≤ Δ₊ due to chance`
-            : `% of connected nodes are closer than Δ₊ and would be if edges were at random`
+            ? `% edges ≤ Δmax due to chance`
+            : `% of connected nodes are closer than Δmax and would be if edges were at random`
           ),
         chartAreaXOffset + 80,
         settings.size + 40,
@@ -1033,8 +1036,8 @@ newRenderer = function(){
         ctx,
         Math.round(100*ccData.C_max)
           +(settings.cc_abridged
-            ? `% edges ≤ Δ₊ due to layout`
-            : `% of connected nodes are closer than Δ₊ due to the effect of the layout`
+            ? `% edges ≤ Δmax due to layout`
+            : `% of connected nodes are closer than Δmax due to the effect of the layout`
           ),
         chartAreaXOffset + 80,
         settings.size + 60,
@@ -1046,8 +1049,8 @@ newRenderer = function(){
         ctx,
         (100-Math.round(100*ccData.C_max)-Math.round(100*ccData.E_percent_of_Delta_max)+Math.round(100*ccData.C_max))
           +(settings.cc_abridged
-            ? `% edges > Δ₊`
-            : `% of connected nodes are more distant than Δ₊`
+            ? `% edges > Δmax`
+            : `% of connected nodes are more distant than Δmax`
           ),
         chartAreaXOffset + 80,
         settings.size + 80,
@@ -1057,8 +1060,8 @@ newRenderer = function(){
       drawText(
         ctx,
         settings.cc_abridged
-          ? `(2 nodes ≤ Δ₊) ⇒ ${Math.round(100*ccData.P_edge_of_Delta_max)}% chance connected`
-          : `Two nodes closer than Δ₊ have a ${Math.round(100*ccData.P_edge_of_Delta_max)}% probability to be connected`
+          ? `(2 nodes ≤ Δmax) ⇒ ${Math.round(100*ccData.P_edge_of_Delta_max)}% chance connected`
+          : `Two nodes closer than Δmax have a ${Math.round(100*ccData.P_edge_of_Delta_max)}% probability to be connected`
           ,
         settings.size/2,
         settings.size + 110,
@@ -1066,7 +1069,7 @@ newRenderer = function(){
       );
       */
     } else if(options.cc_mention_if_not_applicable){
-      drawText(ctx, 'Δ₊ is not applicable.', southPoint.x, southPoint.y + 1.5*lineHeight, "center")
+      drawText(ctx, 'Δmax is not applicable.', southPoint.x, southPoint.y + 1.5*lineHeight, "center")
     }
 
     ns.log("...done.")
@@ -3661,5 +3664,5 @@ newRenderer = function(){
 
 /// FINALLY, RENDER
 let renderer = newRenderer()
-renderer.renderAndSave(g, settings)
-//renderer.renderAndSaveAllTiles(g, settings)
+//renderer.renderAndSave(g, settings)
+renderer.renderAndSaveAllTiles(g, settings)
