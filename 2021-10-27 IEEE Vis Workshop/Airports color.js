@@ -8,7 +8,7 @@ const d3 = require('d3')
 // Read file
 var gexf_string;
 try {
-    gexf_string = fs.readFileSync('data/dividedtheyblog.gexf', 'utf8');
+    gexf_string = fs.readFileSync('data/airports.gexf', 'utf8');
     console.log('GEXF file loaded');    
 } catch(e) {
     console.log('Error:', e.stack);
@@ -30,10 +30,10 @@ console.log('GEXF parsed');
 var settings = {}
 
 // Image size and resolution
-settings.image_width = 420 // in mm. Default: 200mm (fits in a A4 page)
+settings.image_width = 210 // in mm. Default: 200mm (fits in a A4 page)
 settings.image_height = 297
-settings.output_dpi = 600 // Dots per inch.
-settings.rendering_dpi = 600 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
+settings.output_dpi = 300 // Dots per inch.
+settings.rendering_dpi = 300 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
 
 // Tiling:
 // Tiling allows to build images that would be otherwise too large.
@@ -56,9 +56,9 @@ settings.margin_left   =  6 // in mm
 settings.draw_background = true
 settings.draw_network_shape_fill = false
 settings.draw_network_shape_contour = false
-settings.draw_cluster_fills = false
-settings.draw_cluster_contours = false
-settings.draw_cluster_labels = false
+settings.draw_cluster_fills = true
+settings.draw_cluster_contours = true
+settings.draw_cluster_labels = true
 settings.draw_edges = true
 settings.draw_nodes = true
 settings.draw_node_labels = true
@@ -101,16 +101,16 @@ settings.cluster_shape_swelling = 0.75 // Range: 0.01 to 0.99 // Balanced: 0.5 /
 settings.cluster_fill_alpha = 0.3 // Opacity // Range from 0 to 1
 settings.cluster_fill_color_by_modality = true // if false, use default color below
 settings.cluster_fill_color_default = "#8B8B8B"
-settings.cluster_fill_overlay = true // A different blending mode
+settings.cluster_fill_overlay = false // A different blending mode
 // ...cluster contours
-settings.cluster_contour_thickness = .2 // Range: 0 to 10 or more
+settings.cluster_contour_thickness = .6 // Range: 0 to 10 or more
 settings.cluster_contour_alpha = 1 // Opacity // Range from 0 to 1
 settings.cluster_contour_color_by_modality = true // if false, use default color below
 settings.cluster_contour_color_default = "#8B8B8B"
 // ...cluster labels
 settings.cluster_label_colored = true
 settings.cluster_label_font_min_size = 14 // In pt
-settings.cluster_label_font_max_size = 24 // In pt
+settings.cluster_label_font_max_size = 14 // In pt
 settings.cluster_label_font_thickness = .45 // In mm
 settings.cluster_label_border_thickness = 1.6 // In mm
 settings.cluster_label_inner_color = "#ffffff" // Note: here color is on the border
@@ -124,7 +124,7 @@ settings.edge_color = "#b6b8c4"
 // Layer: Nodes
 settings.adjust_voronoi_range = 100 // Factor // Larger node halo
 settings.node_size = 0.8 // Factor to adjust the nodes drawing size
-settings.node_color_original = true // Use the original node color
+settings.node_color_original = false // Use the original node color
 settings.node_stroke_color = "#171637"
 settings.node_fill_color = "#171637"
 
@@ -133,10 +133,10 @@ settings.label_color = "#171637"
 settings.label_max_length = 42 // Number of characters before truncate. Infinity is a valid value.
 settings.label_font_family = "Raleway"
 settings.label_font_min_size = 4 // in pt
-settings.label_font_max_size = 10  // in pt
-settings.label_font_thickness = .12
-settings.label_border_thickness = .8 // in mm
-settings.label_spacing_offset = 1.3 // in mm (prevents label overlap)
+settings.label_font_max_size = 9  // in pt
+settings.label_font_thickness = .16
+settings.label_border_thickness = .6 // in mm
+settings.label_spacing_offset = 0.6 // in mm (prevents label overlap)
 settings.label_border_color = settings.background_color
 
 // Main clusters and color code:
@@ -145,20 +145,55 @@ settings.label_border_color = settings.background_color
 // modalities have which colors. You can generate this
 // JSON object with the PREPARE script.
 settings.node_clusters = {
-  "attribute_id": "Liberal",
+  "attribute_id": "country",
   "modalities": {
-    "0": {
-      "label": "0",
-      "count": 588,
-      "color": "#084594"
+    "United States": {
+      "label": "United States",
+      "count": 551,
+      "color": "#6fc5a4"
     },
-    "1": {
-      "label": "Conservative",
-      "count": 636,
-      "color": "#990000"
+    "Canada": {
+      "label": "Canada",
+      "count": 206,
+      "color": "#f26b6e"
+    },
+    "China": {
+      "label": "China",
+      "count": 173,
+      "color": "#b9a2ce"
+    },
+    "Brazil": {
+      "label": "Brazil",
+      "count": 118,
+      "color": "#e8a74b"
+    },
+    "Australia": {
+      "label": "Australia",
+      "count": 112,
+      "color": "#658ec9"
+    },
+    "Russia": {
+      "label": "Russia",
+      "count": 103,
+      "color": "#f2a5a6"
+    },
+    "India": {
+      "label": "India",
+      "count": 70,
+      "color": "#4aa05b"
+    },
+    "Indonesia": {
+      "label": "Indonesia",
+      "count": 63,
+      "color": "#b65887"
+    },
+    "Japan": {
+      "label": "Japan",
+      "count": 62,
+      "color": "#7169af"
     }
   },
-  "default_color": "#5f6f79"
+  "default_color": "#9d9b99"
 }
 
 // Advanced settings
@@ -1568,7 +1603,7 @@ newRenderer = function(){
 
       // Precompute the label
       // var color = options.colored_labels ? tuneColorForLabel(ncol) : d3.color('#666')
-      var color = d3.color(/*options.label_color*/n.color)
+      var color = d3.color(options.label_color)
       var fontSize = ns.pt_to_pt( options.sized_labels
         ? Math.floor(options.label_font_min_size + (n.size - label_nodeSizeExtent[0]) * (options.label_font_max_size - options.label_font_min_size) / (label_nodeSizeExtent[1] - label_nodeSizeExtent[0]))
         : Math.floor(0.8 * options.label_font_min_size + 0.2 * options.label_font_max_size)
@@ -1958,8 +1993,7 @@ newRenderer = function(){
     }
 
     // Draw each edge
-    // var color = d3.color(options.edge_color)
-    var color // CUSTOM: we pick color depending on node attributes
+    var color = d3.color(options.edge_color)
     var thickness = ns.mm_to_px(options.edge_thickness)
     var jitter = ns.mm_to_px(options.edge_path_jitter)
     var tf = ns.settings.tile_factor
@@ -1977,20 +2011,6 @@ newRenderer = function(){
           var n_t = g.getNodeAttributes(g.target(eid))
           var path, i, x, y, o, dpixi, lastdpixi, lasto, pixi, pi
 
-          if (n_s.value == n_t.value) {
-            if (n_s.value == "0") {
-              color = d3.color("#084594")
-            } else {
-              color = d3.color("#990000")
-            }
-          } else {
-            if (n_s.value == "0") {
-              color = d3.color("#cc9900")
-            } else {
-              color = d3.color("#cc66cc")
-            }
-          }
-
           // Build path
           var d = Math.sqrt(Math.pow(n_s.x - n_t.x, 2) + Math.pow(n_s.y - n_t.y, 2))
           var angle = Math.atan2( n_t.y - n_s.y, n_t.x - n_s.x )
@@ -1998,7 +2018,7 @@ newRenderer = function(){
           var segCount = Math.ceil(d/iPixStep)
           pi = 0
           path = new Int32Array(3*segCount)
-          if (options.edge_curved) {
+          if (options.edge_curved && g.isDirected(eid)) {
             let H = d / (2 * Math.tan(options.edge_curvature_deviation_angle))
             let offset
             for (i=0; i<1; i+=iPixStep/d) {
@@ -2255,7 +2275,7 @@ newRenderer = function(){
 
     options = options || {}
     options.node_size = options.node_size || 1
-    options.node_stroke = false//(options.node_stroke===undefined)?(true):(options.node_stroke)
+    options.node_stroke = (options.node_stroke===undefined)?(true):(options.node_stroke)
     options.node_stroke_width = options.node_stroke_width || 0.08 // in mm
     options.node_color_original = (options.node_color_original===undefined)?(false):(options.node_color_original)
     options.node_fill_color = options.node_fill_color || "#FFF"
