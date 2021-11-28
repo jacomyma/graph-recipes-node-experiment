@@ -66,7 +66,7 @@ settings.draw_hillshading = true
 settings.draw_connected_closeness = false
 
 // Misc.
-settings.pen_size = 0.08 // Manga frame line: 0.5; Thinnest draw pen: 0.03
+settings.pen_size = 0.08 // in mm. Manga frame line: 0.5; Thinnest draw pen: 0.03
 
 // Layer: Background
 settings.background_color = "#ecd0a1"
@@ -153,12 +153,11 @@ settings.heatmap_resolution_max = 1 * Math.pow(10, 5) // in pixel. 10^5 quick. 1
 settings.heatmap_spreading = 12 // in mm
 
 // Experimental stuff
-settings.hillshading_strength = 8 // Elevation factor
+settings.hillshading_strength = 12 // Elevation factor
 settings.hillshading_color = "#4f432f"
 settings.hillshading_alpha = 1. // Opacity
 settings.hillshading_sun_azimuth = Math.PI * 0.6 // angle in radians
-settings.hillshading_sun_elevation = Math.PI * 0.45 // angle in radians
-settings.hillshading_angle_jitter = Math.PI*.05
+settings.hillshading_sun_elevation = Math.PI * 0.4 // angle in radians
 settings.poisson_disc_radius = .666 // in mm
 
 /// (END OF SETTINGS)
@@ -494,17 +493,23 @@ newRenderer = function(){
     options.pen_size = options.pen_size || .2 // in mm
     // options.hillshading_alpha = options.hillshading_alpha || .5
     options.hillshading_color = options.hillshading_color || "#000"
-    options.hillshading_angle_jitter = (options.hillshading_angle_jitter===undefined)?(Math.PI*.1):(options.hillshading_angle_jitter)
     options.random_seed = options.random_seed || 666 // Randomness is seeded for tiling consistency
-    options.area_max_thickness = 3 // in mm
-    options.area_step = .4 // in mm
-    options.area_max_length = 20 // in mm
-    options.area_slope_length = 8 // in mm
-    options.stroke_min_length = .6 // in mm
-    options.stroke_max_length = 50 // in mm
-    options.stroke_step_length = .2 // in mm
-    options.stroke_thickness_decay = .95 // percentage in [0,1]
-    options.stroke_opacity_jitter = .5 // percentage in [0,1]
+    options.hillshading_area_max_thickness = 1.5 // in mm
+    options.hillshading_area_step = .5 // in mm
+    options.hillshading_area_max_length = 40 // in mm
+    options.hillshading_area_slope_length = 15 // in mm
+    options.hillshading_stroke_overlap = 0.5 // in mm
+    options.hillshading_stroke_thickness_ratio = 1.5
+    options.hillshading_stroke_min_length = .25 // in mm
+    options.hillshading_stroke_max_length = 30 // in mm
+    options.hillshading_stroke_step_length = .4 // in mm
+    options.hillshading_stroke_thickness_decay = .95 // percentage in [0,1]
+    options.hillshading_stroke_opacity_jitter = .6 // percentage in [0,1]
+    options.hillshading_stroke_spacing_jitter = .2 // percentage in [0,1]
+    options.hillshading_stroke_angle_jitter = Math.PI * 0.1
+    options.hillshading_stroke_density_max = 5 // in strokes per mm
+    options.hillshading_stroke_density_min = .5 // in strokes per mm
+    options.hillshading_shading_threshold = .5 // percentage in [0,1] where shading is considered null
     options.mask_resolution = options.mask_resolution || 1 * Math.pow(10, 6) // 1000 x 1000 pixels
     // Monitoring only
     options.draw_mask = false
@@ -595,8 +600,8 @@ newRenderer = function(){
 
     ns.log2("Draw hillshade...")
     const thickness = ns.mm_to_px(options.pen_size)
-    const areaMaxThickness = ns.mm_to_px(options.area_max_thickness)*mask.ratio
-    const step_length = ns.mm_to_px(options.area_step)
+    const areaMaxThickness = ns.mm_to_px(options.hillshading_area_max_thickness)*mask.ratio
+    const step_length = ns.mm_to_px(options.hillshading_area_step)
     var path, x, y, x2, y2
     var paths = []
     var points = ns.shuffleArray(ns.getPoissonDiscSampling())
@@ -623,11 +628,11 @@ newRenderer = function(){
 
       if (!pixelIsFree) { return }
 
-      // Path
+      // Determine the draw area of the path
       path = []
       let flag = true
-      let steps = ns.mm_to_px(options.area_max_length) / step_length
-      let slope_steps = ns.mm_to_px(options.area_slope_length) / step_length
+      let steps = ns.mm_to_px(options.hillshading_area_max_length) / step_length
+      let slope_steps = ns.mm_to_px(options.hillshading_area_slope_length) / step_length
       path.push([x, y])
       while (flag && steps-->0) {
         let i = Math.floor(x) + Math.floor(y)*dim.w*ns.settings.tile_factor
@@ -672,7 +677,7 @@ newRenderer = function(){
         dy/=dd
         mask.ctx.beginPath()
         mask.ctx.lineWidth = size*areaMaxThickness
-        mask.ctx.strokeStyle = "#000"//options.hillshading_color
+        mask.ctx.strokeStyle = "#000"
         mask.ctx.moveTo(mask.ratio*x + dy*0.5*size*areaMaxThickness, mask.ratio*y - dx*0.5*size*areaMaxThickness)
         mask.ctx.lineTo(mask.ratio*x2 + dy*0.5*size*areaMaxThickness, mask.ratio*y2 - dx*0.5*size*areaMaxThickness)
         mask.ctx.stroke()
@@ -695,20 +700,26 @@ newRenderer = function(){
       paths.push(path)
     })
 
-    // Reset mask for round 2
+    // Eliminate paths that are too short
+    const minPathLength = ns.mm_to_px(5) / step_length
+    paths = paths.filter(path => {
+      return path.length >= minPathLength
+    })
+
+    // Reset mask for round 2 (strokes)
     ns.paintAll(mask.ctx, '#FFF')
-    const minStrokeLength = Math.ceil(ns.mm_to_px(options.stroke_min_length))
+    const minStrokeLength = Math.ceil(ns.mm_to_px(options.hillshading_stroke_min_length))
     paths.forEach(path => {
       x = path[0][0]
       y = path[0][1]
       for (let i=1; i<path.length; i++) {
         x2 = path[i][0]
         y2 = path[i][1]
-        
+
         mask.ctx.beginPath()
         mask.ctx.lineWidth = mask.ratio*minStrokeLength/2
         mask.ctx.strokeStyle = "#000"
-        mask.ctx.moveTo(mask.ratio*x, mask.ratio*y)
+        mask.ctx.moveTo(mask.ratio*x , mask.ratio*y )
         mask.ctx.lineTo(mask.ratio*x2, mask.ratio*y2)
         mask.ctx.stroke()
 
@@ -717,8 +728,55 @@ newRenderer = function(){
       }
     })
 
-    // Draw each path
-    const maxStrokeLength = Math.floor(ns.mm_to_px(options.stroke_max_length))
+    var lightnessToStrokeDensity = function(l) {
+      let shading = 1-l
+      shading = Math.max(0, shading - options.hillshading_shading_threshold) * (1-options.hillshading_shading_threshold)
+      shading = Math.pow(shading, 2)
+      let density = shading * options.hillshading_stroke_density_max
+      return density
+    }
+
+    // Rewrite each path to have stroke density represent lightness
+    // (each path point is one stroke)
+    // Rewrite path resolution
+    const minStrokeSpacing = ns.mm_to_px(1/options.hillshading_stroke_density_min)
+    paths = paths.map(path => {
+      let newPath, x, y, x2, y2, dx, dy, dd, pi, l, strokeSpacing, lengthOffset
+      x = path[0][0]
+      y = path[0][1]
+      newPath = [] // [[x, y]] // Note: we do not add the first to avoid some glitches
+      pi = Math.floor(x) + Math.floor(y)*dim.w*ns.settings.tile_factor
+      l = lPixelMap[pi] // lightness
+      strokeSpacing = 1/lightnessToStrokeDensity(l)
+      lengthOffset = 0
+      for (let i=1; i<path.length; i++) {
+        x2 = path[i][0]
+        y2 = path[i][1]
+        dx = x2-x
+        dy = y2-y
+        dd = Math.sqrt(dx*dx+dy*dy)
+        dx /= dd
+        dy /= dd
+        while (lengthOffset < dd) {
+          lengthOffset += strokeSpacing * (1 - 0.5 * options.hillshading_stroke_spacing_jitter + options.hillshading_stroke_spacing_jitter * bsRandom())
+          if (strokeSpacing<minStrokeSpacing) {
+            newPath.push([x+lengthOffset*dx, y+lengthOffset*dy])
+          }
+        }
+        lengthOffset -= dd
+        x = x2
+        y = y2
+        pi = Math.floor(x) + Math.floor(y)*dim.w*ns.settings.tile_factor
+        l = lPixelMap[pi] // lightness
+        strokeSpacing = 1/lightnessToStrokeDensity(l)
+      }
+      return newPath
+    })
+    // Eliminate paths that do not have enough steps
+    paths = paths.filter(path => {return path.length > 10})
+
+    // Draw the strokes for each path
+    const maxStrokeLength = Math.floor(ns.mm_to_px(options.hillshading_stroke_max_length))
     paths.forEach(path => {
       x = path[0][0]
       y = path[0][1]
@@ -731,14 +789,18 @@ newRenderer = function(){
         let flag = true
         let stroke_x = x
         let stroke_y = y
-        let length = 0
-        let strokeStep = ns.mm_to_px(options.stroke_step_length)
+        let strokeStep = ns.mm_to_px(options.hillshading_stroke_step_length)
+        let length = strokeStep
+        let overlapSteps = ns.mm_to_px(options.hillshading_stroke_overlap)/strokeStep
         let strokePath = [[stroke_x, stroke_y]]
-        while (flag || length < minStrokeLength) {
+        while (flag || (overlapSteps>0) || length < minStrokeLength) {
+          if (!flag) {
+            overlapSteps--
+          }
           let pi = Math.floor(stroke_x) + Math.floor(stroke_y)*dim.w*ns.settings.tile_factor
           let dx = dxPixelMap[pi]
           let dy = dyPixelMap[pi]
-          let angle = Math.atan2(dy, dx) + options.hillshading_angle_jitter*(bsRandom()-.5)            
+          let angle = Math.atan2(dy, dx) + options.hillshading_stroke_angle_jitter*(bsRandom()-.5)            
 
           stroke_x += strokeStep*Math.cos(angle)
           stroke_y += strokeStep*Math.sin(angle)
@@ -762,7 +824,7 @@ newRenderer = function(){
 
         // Draw the stroke
         if (options.draw_hillshading) {
-          let strokeThickness = thickness
+          let strokeThickness = options.hillshading_stroke_thickness_ratio * thickness
           stroke_x = strokePath[0][0]
           stroke_y = strokePath[0][1]
           for (let stroke_i=1; stroke_i<strokePath.length; stroke_i++){
@@ -771,7 +833,7 @@ newRenderer = function(){
             let new_stroke_y = stroke_xy[1]
 
             let color = d3.color(options.hillshading_color)
-            color.opacity = (1-options.stroke_opacity_jitter) + options.stroke_opacity_jitter*bsRandom()
+            color.opacity = (1-options.hillshading_stroke_opacity_jitter) + options.hillshading_stroke_opacity_jitter*bsRandom()
 
             // Draw line
             let X = stroke_x/ns.settings.tile_factor
@@ -787,7 +849,7 @@ newRenderer = function(){
             
             stroke_x = new_stroke_x
             stroke_y = new_stroke_y
-            strokeThickness *= options.stroke_thickness_decay
+            strokeThickness *= options.hillshading_stroke_thickness_decay
           }
         }
         
@@ -852,7 +914,7 @@ newRenderer = function(){
     options.pen_size = options.pen_size || .2 // in mm
     options.hillshading_alpha = options.hillshading_alpha || .5
     options.hillshading_color = options.hillshading_color || "#000"
-    options.hillshading_angle_jitter = (options.hillshading_angle_jitter===undefined)?(Math.PI*.1):(options.hillshading_angle_jitter)
+    options.hillshading_stroke_angle_jitter = (options.hillshading_stroke_angle_jitter===undefined)?(Math.PI*.1):(options.hillshading_stroke_angle_jitter)
     options.random_seed = options.random_seed || 666 // Randomness is seeded for tiling consistency
 
     var g = ns.g
@@ -938,7 +1000,7 @@ newRenderer = function(){
       let dy = dyPixelMap[i]
       let X = x/ns.settings.tile_factor
       let Y = y/ns.settings.tile_factor
-      let angle = Math.atan2(dy, dx) + options.hillshading_angle_jitter*(bsRandom()-.5)
+      let angle = Math.atan2(dy, dx) + options.hillshading_stroke_angle_jitter*(bsRandom()-.5)
       let l = lPixelMap[i]
       let hillshadeIntensity = hillshadeGradient(1-l)
       let r = len * (1 + .3 * hillshadeIntensity)
