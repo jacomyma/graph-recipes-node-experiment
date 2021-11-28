@@ -30,8 +30,8 @@ console.log('GEXF parsed');
 var settings = {}
 
 // Image size and resolution
-settings.image_width = 1000 // in mm. Default: 200mm (fits in a A4 page)
-settings.image_height = 1000
+settings.image_width = 200 // in mm. Default: 200mm (fits in a A4 page)
+settings.image_height = 200
 settings.output_dpi = 300 // Dots per inch.
 settings.rendering_dpi = 300 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
 
@@ -60,8 +60,8 @@ settings.draw_cluster_fills = false
 settings.draw_cluster_contours = false
 settings.draw_cluster_labels = false
 settings.draw_edges = false
-settings.draw_nodes = true
-settings.draw_node_labels = true
+settings.draw_nodes = false
+settings.draw_node_labels = false
 settings.draw_hillshading = true
 settings.draw_connected_closeness = false
 
@@ -158,7 +158,8 @@ settings.hillshading_color = "#4f432f"
 settings.hillshading_alpha = 1. // Opacity
 settings.hillshading_sun_azimuth = Math.PI * 0.6 // angle in radians
 settings.hillshading_sun_elevation = Math.PI * 0.45 // angle in radians
-settings.poisson_disc_radius = .3 // in mm
+settings.hillshading_angle_jitter = Math.PI*.05
+settings.poisson_disc_radius = .666 // in mm
 
 /// (END OF SETTINGS)
 
@@ -468,7 +469,383 @@ newRenderer = function(){
     }
   }
 
+  ns.shuffleArray = function(array) {
+    let currentIndex = array.length,  randomIndex;
+
+    // While there remain elements to shuffle...
+    while (currentIndex != 0) {
+
+      // Pick a remaining element...
+      randomIndex = Math.floor(Math.random() * currentIndex);
+      currentIndex--;
+
+      // And swap it with the current element.
+      [array[currentIndex], array[randomIndex]] = [
+        array[randomIndex], array[currentIndex]];
+    }
+
+    return array;
+  }
+
   ns.drawHillshadingLines = function(options) {
+    ns.log("Draw Hillshading Lines...")
+    
+    var options = options || {}
+    options.pen_size = options.pen_size || .2 // in mm
+    // options.hillshading_alpha = options.hillshading_alpha || .5
+    options.hillshading_color = options.hillshading_color || "#000"
+    options.hillshading_angle_jitter = (options.hillshading_angle_jitter===undefined)?(Math.PI*.1):(options.hillshading_angle_jitter)
+    options.random_seed = options.random_seed || 666 // Randomness is seeded for tiling consistency
+    options.area_max_thickness = 3 // in mm
+    options.area_step = .4 // in mm
+    options.area_max_length = 20 // in mm
+    options.area_slope_length = 8 // in mm
+    options.stroke_min_length = .6 // in mm
+    options.stroke_max_length = 50 // in mm
+    options.stroke_step_length = .2 // in mm
+    options.stroke_thickness_decay = .95 // percentage in [0,1]
+    options.stroke_opacity_jitter = .5 // percentage in [0,1]
+    options.mask_resolution = options.mask_resolution || 1 * Math.pow(10, 6) // 1000 x 1000 pixels
+    // Monitoring only
+    options.draw_mask = false
+    options.draw_additional_info = false
+    options.draw_hillshading = true
+
+    var g = ns.g
+    var dim = ns.getRenderingPixelDimensions()
+    var ctx = ns.createCanvas().getContext("2d")
+    ns.scaleContext(ctx)
+
+    /// Unpack hillshading data
+    var shadingData = ns.getHillshadingData()
+
+    // Unpack hillshading
+    var ratio = 1/shadingData.ratio
+    var lPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
+    var dxPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
+    var dyPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
+    var xu, yu, xp, xp1, xp2, dx, yp, yp1, yp2, dy, ip_top_left, ip_top_right, ip_bottom_left, ip_bottom_right
+    for (var i=0; i<lPixelMap.length; i++) {
+      // unpacked coordinates
+      xu = i%(dim.w * ns.settings.tile_factor)
+      yu = (i-xu)/(dim.w * ns.settings.tile_factor)
+      // packed coordinates
+      xp = xu/ratio
+      xp1 = Math.max(0, Math.min(shadingData.width, Math.floor(xp)))
+      xp2 = Math.max(0, Math.min(shadingData.width, Math.ceil(xp)))
+      dx = (xp-xp1)/(xp2-xp1) || 0
+      yp = yu/ratio
+      yp1 = Math.max(0, Math.min(shadingData.height, Math.floor(yp)))
+      yp2 = Math.max(0, Math.min(shadingData.height, Math.ceil(yp)))
+      dy = (yp-yp1)/(yp2-yp1) || 0
+      // coordinates of the 4 pixels necessary to rescale
+      ip_top_left = xp1 + (shadingData.width+1) * yp1
+      ip_top_right = xp2 + (shadingData.width+1) * yp1
+      ip_bottom_left = xp1 + (shadingData.width+1) * yp2
+      ip_bottom_right = xp2 + (shadingData.width+1) * yp2
+      // Rescaling (gradual blending between the 4 pixels)
+      lPixelMap[i] =
+          (1-dx) * (
+            (1-dy) * shadingData.lPixelMap[ip_top_left]
+            +  dy  * shadingData.lPixelMap[ip_bottom_left]
+          )
+        + dx * (
+            (1-dy) * shadingData.lPixelMap[ip_top_right]
+            +  dy  * shadingData.lPixelMap[ip_bottom_right]
+          )
+      dxPixelMap[i] =
+          (1-dx) * (
+            (1-dy) * shadingData.dxPixelMap[ip_top_left]
+            +  dy  * shadingData.dxPixelMap[ip_bottom_left]
+          )
+        + dx * (
+            (1-dy) * shadingData.dxPixelMap[ip_top_right]
+            +  dy  * shadingData.dxPixelMap[ip_bottom_right]
+          )
+      dyPixelMap[i] =
+          (1-dx) * (
+            (1-dy) * shadingData.dyPixelMap[ip_top_left]
+            +  dy  * shadingData.dyPixelMap[ip_bottom_left]
+          )
+        + dx * (
+            (1-dy) * shadingData.dyPixelMap[ip_top_right]
+            +  dy  * shadingData.dyPixelMap[ip_bottom_right]
+          )
+    }
+
+    // Create mask canvas
+    var mask = {}
+    if (dim.w*dim.h>options.mask_resolution) {
+      mask.ratio = Math.sqrt(options.mask_resolution/(dim.w*dim.h))
+      mask.width = Math.floor(mask.ratio*dim.w)
+      mask.height = Math.floor(mask.ratio*dim.h)
+    } else {
+      mask.ratio = 1
+      mask.width = dim.w
+      mask.height = dim.h
+    }
+    console.log("Hillshading mask ratio:",mask.ratio,"- Dimensions: "+mask.width+" x "+mask.height)
+    mask.canvas = ns.createCanvas()
+    mask.canvas.width = mask.width
+    mask.canvas.height = mask.height
+    mask.ctx = mask.canvas.getContext("2d")
+    mask.ctx.lineCap = "round"
+    mask.ctx.lineJoin = "round"
+    ns.paintAll(mask.ctx, '#FFF')
+
+    ns.log2("Draw hillshade...")
+    const thickness = ns.mm_to_px(options.pen_size)
+    const areaMaxThickness = ns.mm_to_px(options.area_max_thickness)*mask.ratio
+    const step_length = ns.mm_to_px(options.area_step)
+    var path, x, y, x2, y2
+    var paths = []
+    var points = ns.shuffleArray(ns.getPoissonDiscSampling())
+    points.forEach(xy => {
+      x = Math.floor(xy[0])
+      y = Math.floor(xy[1])
+
+      // Test mask
+      var pixel = mask.ctx.getImageData(Math.floor(x*mask.ratio), Math.floor(y*mask.ratio), 1, 1).data
+      var pixelIsFree = pixel[0] >= 230
+      if (options.draw_additional_info) {
+        if (pixelIsFree) {
+          ctx.fillStyle = "#0F0";
+          ctx.beginPath();
+          ctx.arc(x, y, 1.5, 0, 2 * Math.PI);
+          ctx.fill();
+        } else {
+          ctx.fillStyle = "#F00";
+          ctx.beginPath();
+          ctx.arc(x, y, 1.5, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+      }
+
+      if (!pixelIsFree) { return }
+
+      // Path
+      path = []
+      let flag = true
+      let steps = ns.mm_to_px(options.area_max_length) / step_length
+      let slope_steps = ns.mm_to_px(options.area_slope_length) / step_length
+      path.push([x, y])
+      while (flag && steps-->0) {
+        let i = Math.floor(x) + Math.floor(y)*dim.w*ns.settings.tile_factor
+        let dx = -dyPixelMap[i]
+        let dy = dxPixelMap[i]
+        let ratio = step_length / Math.sqrt(dx*dx+dy*dy)
+        x2 = x + dx*ratio
+        y2 = y + dy*ratio
+
+        // Test mask
+        if (x2<0 || x2>=dim.w || y2<0 || y2>=dim.h) {
+          flag = false
+        } else {
+          let pixel = mask.ctx.getImageData(Math.floor(x2*mask.ratio), Math.floor(y2*mask.ratio), 1, 1).data
+          if (pixel[0]<230) {
+            // End the path
+            flag = false
+          }
+        }
+
+        if (flag) {
+          path.push([x2, y2])
+        }
+
+        x = x2
+        y = y2
+      }
+
+      // Draw mask
+      x = path[0][0]
+      y = path[0][1]
+      for (let i=1; i<path.length; i++) {
+        x2 = path[i][0]
+        y2 = path[i][1]
+
+        let size = Math.sqrt(1 - Math.max(Math.max(0, slope_steps - (path.length - i)), slope_steps - i)/slope_steps)
+
+        let dx = mask.ratio*x2 - mask.ratio*x
+        let dy = mask.ratio*y2 - mask.ratio*y
+        let dd = Math.sqrt(dx*dx+dy*dy)
+        dx/=dd
+        dy/=dd
+        mask.ctx.beginPath()
+        mask.ctx.lineWidth = size*areaMaxThickness
+        mask.ctx.strokeStyle = "#000"//options.hillshading_color
+        mask.ctx.moveTo(mask.ratio*x + dy*0.5*size*areaMaxThickness, mask.ratio*y - dx*0.5*size*areaMaxThickness)
+        mask.ctx.lineTo(mask.ratio*x2 + dy*0.5*size*areaMaxThickness, mask.ratio*y2 - dx*0.5*size*areaMaxThickness)
+        mask.ctx.stroke()
+
+        // Draw actual drawing for monitoring
+        if (options.draw_additional_info) {
+          ctx.lineCap = "round"
+          ctx.lineJoin = "round"
+          ctx.beginPath()
+          ctx.lineWidth = 2
+          ctx.strokeStyle = "#66F"
+          ctx.moveTo(x, y)
+          ctx.lineTo(x2, y2)
+          ctx.stroke()
+        }
+
+        x = x2
+        y = y2
+      }
+      paths.push(path)
+    })
+
+    // Reset mask for round 2
+    ns.paintAll(mask.ctx, '#FFF')
+    const minStrokeLength = Math.ceil(ns.mm_to_px(options.stroke_min_length))
+    paths.forEach(path => {
+      x = path[0][0]
+      y = path[0][1]
+      for (let i=1; i<path.length; i++) {
+        x2 = path[i][0]
+        y2 = path[i][1]
+        
+        mask.ctx.beginPath()
+        mask.ctx.lineWidth = mask.ratio*minStrokeLength/2
+        mask.ctx.strokeStyle = "#000"
+        mask.ctx.moveTo(mask.ratio*x, mask.ratio*y)
+        mask.ctx.lineTo(mask.ratio*x2, mask.ratio*y2)
+        mask.ctx.stroke()
+
+        x = x2
+        y = y2
+      }
+    })
+
+    // Draw each path
+    const maxStrokeLength = Math.floor(ns.mm_to_px(options.stroke_max_length))
+    paths.forEach(path => {
+      x = path[0][0]
+      y = path[0][1]
+      let pathStrokes = []
+      for (let i=1; i<path.length; i++) {
+        x2 = path[i][0]
+        y2 = path[i][1]
+
+        // Gradually draw (compute) the path
+        let flag = true
+        let stroke_x = x
+        let stroke_y = y
+        let length = 0
+        let strokeStep = ns.mm_to_px(options.stroke_step_length)
+        let strokePath = [[stroke_x, stroke_y]]
+        while (flag || length < minStrokeLength) {
+          let pi = Math.floor(stroke_x) + Math.floor(stroke_y)*dim.w*ns.settings.tile_factor
+          let dx = dxPixelMap[pi]
+          let dy = dyPixelMap[pi]
+          let angle = Math.atan2(dy, dx) + options.hillshading_angle_jitter*(bsRandom()-.5)            
+
+          stroke_x += strokeStep*Math.cos(angle)
+          stroke_y += strokeStep*Math.sin(angle)
+          length += strokeStep
+
+          strokePath.push([stroke_x, stroke_y])
+
+          // Test mask
+          if (stroke_x<0 || stroke_x>=dim.w || stroke_y<0 || stroke_y>=dim.h) {
+            flag = false
+          } else if (length > maxStrokeLength) {
+            flag = false
+          } else if (length > minStrokeLength){
+            let pixel = mask.ctx.getImageData(Math.floor(stroke_x*mask.ratio), Math.floor(stroke_y*mask.ratio), 1, 1).data
+            if (pixel[0]<230) {
+              // End the path
+              flag = false
+            }
+          }
+        }
+
+        // Draw the stroke
+        if (options.draw_hillshading) {
+          let strokeThickness = thickness
+          stroke_x = strokePath[0][0]
+          stroke_y = strokePath[0][1]
+          for (let stroke_i=1; stroke_i<strokePath.length; stroke_i++){
+            let stroke_xy = strokePath[stroke_i]
+            let new_stroke_x = stroke_xy[0]
+            let new_stroke_y = stroke_xy[1]
+
+            let color = d3.color(options.hillshading_color)
+            color.opacity = (1-options.stroke_opacity_jitter) + options.stroke_opacity_jitter*bsRandom()
+
+            // Draw line
+            let X = stroke_x/ns.settings.tile_factor
+            let Y = stroke_y/ns.settings.tile_factor
+            let new_X = new_stroke_x/ns.settings.tile_factor
+            let new_Y = new_stroke_y/ns.settings.tile_factor
+            ctx.beginPath()
+            ctx.lineWidth = strokeThickness
+            ctx.strokeStyle = color.toString()
+            ctx.moveTo(X, Y)
+            ctx.lineTo(new_X, new_Y)
+            ctx.stroke()
+            
+            stroke_x = new_stroke_x
+            stroke_y = new_stroke_y
+            strokeThickness *= options.stroke_thickness_decay
+          }
+        }
+        
+        pathStrokes.push(strokePath)
+        x = x2
+        y = y2
+      }
+
+      // Draw the strokes on the mask
+      pathStrokes.forEach(strokePath => {
+        stroke_x = strokePath[0][0]
+        stroke_y = strokePath[0][1]
+        for (let stroke_i=1; stroke_i<strokePath.length; stroke_i++){
+          let stroke_xy = strokePath[stroke_i]
+          let new_stroke_x = stroke_xy[0]
+          let new_stroke_y = stroke_xy[1]
+
+          // Draw line
+          mask.ctx.beginPath()
+          mask.ctx.lineWidth = mask.ratio * step_length
+          mask.ctx.strokeStyle = "#000"
+          mask.ctx.moveTo(mask.ratio*stroke_x, mask.ratio*stroke_y)
+          mask.ctx.lineTo(mask.ratio*new_stroke_x, mask.ratio*new_stroke_y)
+          mask.ctx.stroke()
+          
+          stroke_x = new_stroke_x
+          stroke_y = new_stroke_y
+        }
+      })
+    })
+
+    ns.report2("...done.")
+
+    if (options.draw_mask) {
+      let canvas = ns.createCanvas()
+      let outputCtx = canvas.getContext("2d")
+      outputCtx.imageSmoothingEnabled = true
+      outputCtx.imageSmoothingQuality = "high"
+      // Draw mask
+      outputCtx.drawImage(mask.ctx.canvas, 0, 0, ctx.canvas.width, ctx.canvas.height)
+      // Draw normal stuff
+      outputCtx.drawImage(ctx.canvas, 0, 0, ctx.canvas.width, ctx.canvas.height)
+      ctx = outputCtx
+    }
+
+    ns.report("...done.")
+    return ns.multiplyAlpha(
+      ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height),
+      options.hillshading_alpha
+    )
+    // Bad seeded randomness
+    function bsRandom() {
+      var x = Math.sin(options.random_seed++) * 10000;
+      return x - Math.floor(x);
+    }
+  }
+
+  ns.drawHillshadingLines_old = function(options) {
     ns.log("Draw Hillshading Lines...")
     
     var options = options || {}
