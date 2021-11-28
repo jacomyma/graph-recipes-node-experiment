@@ -494,9 +494,10 @@ newRenderer = function(){
     // options.hillshading_alpha = options.hillshading_alpha || .5
     options.hillshading_color = options.hillshading_color || "#000"
     options.random_seed = options.random_seed || 666 // Randomness is seeded for tiling consistency
-    options.hillshading_area_max_thickness = 1.5 // in mm
+    options.hillshading_area_max_thickness = 5 // in mm
     options.hillshading_area_step = .5 // in mm
     options.hillshading_area_max_length = 40 // in mm
+    options.hillshading_area_min_length = 8 // in mm
     options.hillshading_area_slope_length = 15 // in mm
     options.hillshading_stroke_overlap = 0.5 // in mm
     options.hillshading_stroke_thickness_ratio = 1.5
@@ -511,10 +512,11 @@ newRenderer = function(){
     options.hillshading_stroke_density_min = .5 // in strokes per mm
     options.hillshading_shading_threshold = .5 // percentage in [0,1] where shading is considered null
     options.mask_resolution = options.mask_resolution || 1 * Math.pow(10, 6) // 1000 x 1000 pixels
-    // Monitoring only
-    options.draw_mask = false
-    options.draw_additional_info = false
-    options.draw_hillshading = true
+    // Monitoring
+    options.draw_mask = false // default: false. Use for monitoring purpose only.
+    options.draw_additional_info = false // default: false. Use for monitoring purpose only.
+    options.stop_after_areas = false // default: false. Use for monitoring purpose only.
+    options.draw_hillshading = true // default: true. Use for monitoring purpose only.
 
     var g = ns.g
     var dim = ns.getRenderingPixelDimensions()
@@ -523,10 +525,11 @@ newRenderer = function(){
 
     /// Unpack hillshading data
     var shadingData = ns.getHillshadingData()
-
+    
     // Unpack hillshading
     var ratio = 1/shadingData.ratio
     var lPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
+    var hPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
     var dxPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
     var dyPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
     var xu, yu, xp, xp1, xp2, dx, yp, yp1, yp2, dy, ip_top_left, ip_top_right, ip_bottom_left, ip_bottom_right
@@ -557,6 +560,15 @@ newRenderer = function(){
         + dx * (
             (1-dy) * shadingData.lPixelMap[ip_top_right]
             +  dy  * shadingData.lPixelMap[ip_bottom_right]
+          )
+      hPixelMap[i] =
+          (1-dx) * (
+            (1-dy) * shadingData.hPixelMap[ip_top_left]
+            +  dy  * shadingData.hPixelMap[ip_bottom_left]
+          )
+        + dx * (
+            (1-dy) * shadingData.hPixelMap[ip_top_right]
+            +  dy  * shadingData.hPixelMap[ip_bottom_right]
           )
       dxPixelMap[i] =
           (1-dx) * (
@@ -605,6 +617,23 @@ newRenderer = function(){
     var path, x, y, x2, y2
     var paths = []
     var points = ns.shuffleArray(ns.getPoissonDiscSampling())
+
+    // Index points by elevation
+    points.forEach(p => {
+      let x = p[0]
+      let y = p[1]
+      let i = Math.floor(x) + Math.floor(y)*dim.w*ns.settings.tile_factor
+      let h = +hPixelMap[i]
+      if (isNaN(h)) {
+        h = 0
+      }
+      p[2] = h
+    })
+
+    // Sort points by elevation
+    points = points.sort(function(a, b){ return +(b[2]-a[2])})
+
+    // For each point, find a path
     points.forEach(xy => {
       x = Math.floor(xy[0])
       y = Math.floor(xy[1])
@@ -661,170 +690,211 @@ newRenderer = function(){
         y = y2
       }
 
-      // Draw mask
-      x = path[0][0]
-      y = path[0][1]
-      for (let i=1; i<path.length; i++) {
-        x2 = path[i][0]
-        y2 = path[i][1]
+      let steps_min = ns.mm_to_px(options.hillshading_area_min_length) / step_length
+      if (path.length >=steps_min) {
 
-        let size = Math.sqrt(1 - Math.max(Math.max(0, slope_steps - (path.length - i)), slope_steps - i)/slope_steps)
+        // Draw mask
+        x = path[0][0]
+        y = path[0][1]
+        for (let i=1; i<path.length; i++) {
+          x2 = path[i][0]
+          y2 = path[i][1]
 
-        let dx = mask.ratio*x2 - mask.ratio*x
-        let dy = mask.ratio*y2 - mask.ratio*y
-        let dd = Math.sqrt(dx*dx+dy*dy)
-        dx/=dd
-        dy/=dd
-        mask.ctx.beginPath()
-        mask.ctx.lineWidth = size*areaMaxThickness
-        mask.ctx.strokeStyle = "#000"
-        mask.ctx.moveTo(mask.ratio*x + dy*0.5*size*areaMaxThickness, mask.ratio*y - dx*0.5*size*areaMaxThickness)
-        mask.ctx.lineTo(mask.ratio*x2 + dy*0.5*size*areaMaxThickness, mask.ratio*y2 - dx*0.5*size*areaMaxThickness)
-        mask.ctx.stroke()
+          let size = Math.sqrt(1 - Math.max(Math.max(0, slope_steps - (path.length - i)), slope_steps - i)/slope_steps)
 
-        // Draw actual drawing for monitoring
-        if (options.draw_additional_info) {
-          ctx.lineCap = "round"
-          ctx.lineJoin = "round"
-          ctx.beginPath()
-          ctx.lineWidth = 2
-          ctx.strokeStyle = "#66F"
-          ctx.moveTo(x, y)
-          ctx.lineTo(x2, y2)
-          ctx.stroke()
-        }
+          let dx = mask.ratio*x2 - mask.ratio*x
+          let dy = mask.ratio*y2 - mask.ratio*y
+          let dd = Math.sqrt(dx*dx+dy*dy)
+          dx/=dd
+          dy/=dd
+          mask.ctx.beginPath()
+          mask.ctx.lineWidth = size*areaMaxThickness
+          mask.ctx.strokeStyle = "#000"
+          mask.ctx.moveTo(mask.ratio*x + dy*0.5*size*areaMaxThickness, mask.ratio*y - dx*0.5*size*areaMaxThickness)
+          mask.ctx.lineTo(mask.ratio*x2 + dy*0.5*size*areaMaxThickness, mask.ratio*y2 - dx*0.5*size*areaMaxThickness)
+          mask.ctx.stroke()
 
-        x = x2
-        y = y2
-      }
-      paths.push(path)
-    })
-
-    // Eliminate paths that are too short
-    const minPathLength = ns.mm_to_px(5) / step_length
-    paths = paths.filter(path => {
-      return path.length >= minPathLength
-    })
-
-    // Reset mask for round 2 (strokes)
-    ns.paintAll(mask.ctx, '#FFF')
-    const minStrokeLength = Math.ceil(ns.mm_to_px(options.hillshading_stroke_min_length))
-    paths.forEach(path => {
-      x = path[0][0]
-      y = path[0][1]
-      for (let i=1; i<path.length; i++) {
-        x2 = path[i][0]
-        y2 = path[i][1]
-
-        mask.ctx.beginPath()
-        mask.ctx.lineWidth = mask.ratio*minStrokeLength/2
-        mask.ctx.strokeStyle = "#000"
-        mask.ctx.moveTo(mask.ratio*x , mask.ratio*y )
-        mask.ctx.lineTo(mask.ratio*x2, mask.ratio*y2)
-        mask.ctx.stroke()
-
-        x = x2
-        y = y2
-      }
-    })
-
-    var lightnessToStrokeDensity = function(l) {
-      let shading = 1-l
-      shading = Math.max(0, shading - options.hillshading_shading_threshold) * (1-options.hillshading_shading_threshold)
-      shading = Math.pow(shading, 2)
-      let density = shading * options.hillshading_stroke_density_max
-      return density
-    }
-
-    // Rewrite each path to have stroke density represent lightness
-    // (each path point is one stroke)
-    // Rewrite path resolution
-    const minStrokeSpacing = ns.mm_to_px(1/options.hillshading_stroke_density_min)
-    paths = paths.map(path => {
-      let newPath, x, y, x2, y2, dx, dy, dd, pi, l, strokeSpacing, lengthOffset
-      x = path[0][0]
-      y = path[0][1]
-      newPath = [] // [[x, y]] // Note: we do not add the first to avoid some glitches
-      pi = Math.floor(x) + Math.floor(y)*dim.w*ns.settings.tile_factor
-      l = lPixelMap[pi] // lightness
-      strokeSpacing = 1/lightnessToStrokeDensity(l)
-      lengthOffset = 0
-      for (let i=1; i<path.length; i++) {
-        x2 = path[i][0]
-        y2 = path[i][1]
-        dx = x2-x
-        dy = y2-y
-        dd = Math.sqrt(dx*dx+dy*dy)
-        dx /= dd
-        dy /= dd
-        while (lengthOffset < dd) {
-          lengthOffset += strokeSpacing * (1 - 0.5 * options.hillshading_stroke_spacing_jitter + options.hillshading_stroke_spacing_jitter * bsRandom())
-          if (strokeSpacing<minStrokeSpacing) {
-            newPath.push([x+lengthOffset*dx, y+lengthOffset*dy])
+          // Draw actual drawing for monitoring
+          if (options.draw_additional_info) {
+            ctx.lineCap = "round"
+            ctx.lineJoin = "round"
+            ctx.beginPath()
+            ctx.lineWidth = 2
+            ctx.strokeStyle = "#66F"
+            ctx.moveTo(x, y)
+            ctx.lineTo(x2, y2)
+            ctx.stroke()
           }
+
+          x = x2
+          y = y2
         }
-        lengthOffset -= dd
-        x = x2
-        y = y2
+        paths.push(path)
+      }
+    })
+
+    if (!options.stop_after_areas) {
+
+      // Eliminate paths that are too short
+      const minPathLength = ns.mm_to_px(5) / step_length
+      paths = paths.filter(path => {
+        return path.length >= minPathLength
+      })
+
+      // Reset mask for round 2 (strokes)
+      ns.paintAll(mask.ctx, '#FFF')
+      const minStrokeLength = Math.ceil(ns.mm_to_px(options.hillshading_stroke_min_length))
+      paths.forEach(path => {
+        x = path[0][0]
+        y = path[0][1]
+        for (let i=1; i<path.length; i++) {
+          x2 = path[i][0]
+          y2 = path[i][1]
+
+          mask.ctx.beginPath()
+          mask.ctx.lineWidth = mask.ratio*minStrokeLength/2
+          mask.ctx.strokeStyle = "#000"
+          mask.ctx.moveTo(mask.ratio*x , mask.ratio*y )
+          mask.ctx.lineTo(mask.ratio*x2, mask.ratio*y2)
+          mask.ctx.stroke()
+
+          x = x2
+          y = y2
+        }
+      })
+
+      var lightnessToStrokeDensity = function(l) {
+        let shading = 1-l
+        shading = Math.max(0, shading - options.hillshading_shading_threshold) * (1-options.hillshading_shading_threshold)
+        shading = Math.pow(shading, 2)
+        let density = shading * options.hillshading_stroke_density_max
+        return density
+      }
+
+      // Rewrite each path to have stroke density represent lightness
+      // (each path point is one stroke)
+      // Rewrite path resolution
+      const minStrokeSpacing = ns.mm_to_px(1/options.hillshading_stroke_density_min)
+      paths = paths.map(path => {
+        let newPath, x, y, x2, y2, dx, dy, dd, pi, l, strokeSpacing, lengthOffset
+        x = path[0][0]
+        y = path[0][1]
+        newPath = [] // [[x, y]] // Note: we do not add the first to avoid some glitches
         pi = Math.floor(x) + Math.floor(y)*dim.w*ns.settings.tile_factor
         l = lPixelMap[pi] // lightness
         strokeSpacing = 1/lightnessToStrokeDensity(l)
-      }
-      return newPath
-    })
-    // Eliminate paths that do not have enough steps
-    paths = paths.filter(path => {return path.length > 10})
-
-    // Draw the strokes for each path
-    const maxStrokeLength = Math.floor(ns.mm_to_px(options.hillshading_stroke_max_length))
-    paths.forEach(path => {
-      x = path[0][0]
-      y = path[0][1]
-      let pathStrokes = []
-      for (let i=1; i<path.length; i++) {
-        x2 = path[i][0]
-        y2 = path[i][1]
-
-        // Gradually draw (compute) the path
-        let flag = true
-        let stroke_x = x
-        let stroke_y = y
-        let strokeStep = ns.mm_to_px(options.hillshading_stroke_step_length)
-        let length = strokeStep
-        let overlapSteps = ns.mm_to_px(options.hillshading_stroke_overlap)/strokeStep
-        let strokePath = [[stroke_x, stroke_y]]
-        while (flag || (overlapSteps>0) || length < minStrokeLength) {
-          if (!flag) {
-            overlapSteps--
-          }
-          let pi = Math.floor(stroke_x) + Math.floor(stroke_y)*dim.w*ns.settings.tile_factor
-          let dx = dxPixelMap[pi]
-          let dy = dyPixelMap[pi]
-          let angle = Math.atan2(dy, dx) + options.hillshading_stroke_angle_jitter*(bsRandom()-.5)            
-
-          stroke_x += strokeStep*Math.cos(angle)
-          stroke_y += strokeStep*Math.sin(angle)
-          length += strokeStep
-
-          strokePath.push([stroke_x, stroke_y])
-
-          // Test mask
-          if (stroke_x<0 || stroke_x>=dim.w || stroke_y<0 || stroke_y>=dim.h) {
-            flag = false
-          } else if (length > maxStrokeLength) {
-            flag = false
-          } else if (length > minStrokeLength){
-            let pixel = mask.ctx.getImageData(Math.floor(stroke_x*mask.ratio), Math.floor(stroke_y*mask.ratio), 1, 1).data
-            if (pixel[0]<230) {
-              // End the path
-              flag = false
+        lengthOffset = 0
+        for (let i=1; i<path.length; i++) {
+          x2 = path[i][0]
+          y2 = path[i][1]
+          dx = x2-x
+          dy = y2-y
+          dd = Math.sqrt(dx*dx+dy*dy)
+          dx /= dd
+          dy /= dd
+          while (lengthOffset < dd) {
+            lengthOffset += strokeSpacing * (1 - 0.5 * options.hillshading_stroke_spacing_jitter + options.hillshading_stroke_spacing_jitter * bsRandom())
+            if (strokeSpacing<minStrokeSpacing) {
+              newPath.push([x+lengthOffset*dx, y+lengthOffset*dy])
             }
           }
+          lengthOffset -= dd
+          x = x2
+          y = y2
+          pi = Math.floor(x) + Math.floor(y)*dim.w*ns.settings.tile_factor
+          l = lPixelMap[pi] // lightness
+          strokeSpacing = 1/lightnessToStrokeDensity(l)
+        }
+        return newPath
+      })
+      // Eliminate paths that do not have enough steps
+      paths = paths.filter(path => {return path.length > 10})
+
+      // Draw the strokes for each path
+      const maxStrokeLength = Math.floor(ns.mm_to_px(options.hillshading_stroke_max_length))
+      paths.forEach(path => {
+        x = path[0][0]
+        y = path[0][1]
+        let pathStrokes = []
+        for (let i=1; i<path.length; i++) {
+          x2 = path[i][0]
+          y2 = path[i][1]
+
+          // Gradually draw (compute) the path
+          let flag = true
+          let stroke_x = x
+          let stroke_y = y
+          let strokeStep = ns.mm_to_px(options.hillshading_stroke_step_length)
+          let length = strokeStep
+          let overlapSteps = ns.mm_to_px(options.hillshading_stroke_overlap)/strokeStep
+          let strokePath = [[stroke_x, stroke_y]]
+          while (flag || (overlapSteps>0) || length < minStrokeLength) {
+            if (!flag) {
+              overlapSteps--
+            }
+            let pi = Math.floor(stroke_x) + Math.floor(stroke_y)*dim.w*ns.settings.tile_factor
+            let dx = dxPixelMap[pi]
+            let dy = dyPixelMap[pi]
+            let angle = Math.atan2(dy, dx) + options.hillshading_stroke_angle_jitter*(bsRandom()-.5)            
+
+            stroke_x += strokeStep*Math.cos(angle)
+            stroke_y += strokeStep*Math.sin(angle)
+            length += strokeStep
+
+            strokePath.push([stroke_x, stroke_y])
+
+            // Test mask
+            if (stroke_x<0 || stroke_x>=dim.w || stroke_y<0 || stroke_y>=dim.h) {
+              flag = false
+            } else if (length > maxStrokeLength) {
+              flag = false
+            } else if (length > minStrokeLength){
+              let pixel = mask.ctx.getImageData(Math.floor(stroke_x*mask.ratio), Math.floor(stroke_y*mask.ratio), 1, 1).data
+              if (pixel[0]<230) {
+                // End the path
+                flag = false
+              }
+            }
+          }
+
+          // Draw the stroke
+          if (options.draw_hillshading) {
+            let strokeThickness = options.hillshading_stroke_thickness_ratio * thickness
+            stroke_x = strokePath[0][0]
+            stroke_y = strokePath[0][1]
+            for (let stroke_i=1; stroke_i<strokePath.length; stroke_i++){
+              let stroke_xy = strokePath[stroke_i]
+              let new_stroke_x = stroke_xy[0]
+              let new_stroke_y = stroke_xy[1]
+
+              let color = d3.color(options.hillshading_color)
+              color.opacity = (1-options.hillshading_stroke_opacity_jitter) + options.hillshading_stroke_opacity_jitter*bsRandom()
+
+              // Draw line
+              let X = stroke_x/ns.settings.tile_factor
+              let Y = stroke_y/ns.settings.tile_factor
+              let new_X = new_stroke_x/ns.settings.tile_factor
+              let new_Y = new_stroke_y/ns.settings.tile_factor
+              ctx.beginPath()
+              ctx.lineWidth = strokeThickness
+              ctx.strokeStyle = color.toString()
+              ctx.moveTo(X, Y)
+              ctx.lineTo(new_X, new_Y)
+              ctx.stroke()
+              
+              stroke_x = new_stroke_x
+              stroke_y = new_stroke_y
+              strokeThickness *= options.hillshading_stroke_thickness_decay
+            }
+          }
+          
+          pathStrokes.push(strokePath)
+          x = x2
+          y = y2
         }
 
-        // Draw the stroke
-        if (options.draw_hillshading) {
-          let strokeThickness = options.hillshading_stroke_thickness_ratio * thickness
+        // Draw the strokes on the mask
+        pathStrokes.forEach(strokePath => {
           stroke_x = strokePath[0][0]
           stroke_y = strokePath[0][1]
           for (let stroke_i=1; stroke_i<strokePath.length; stroke_i++){
@@ -832,54 +902,20 @@ newRenderer = function(){
             let new_stroke_x = stroke_xy[0]
             let new_stroke_y = stroke_xy[1]
 
-            let color = d3.color(options.hillshading_color)
-            color.opacity = (1-options.hillshading_stroke_opacity_jitter) + options.hillshading_stroke_opacity_jitter*bsRandom()
-
             // Draw line
-            let X = stroke_x/ns.settings.tile_factor
-            let Y = stroke_y/ns.settings.tile_factor
-            let new_X = new_stroke_x/ns.settings.tile_factor
-            let new_Y = new_stroke_y/ns.settings.tile_factor
-            ctx.beginPath()
-            ctx.lineWidth = strokeThickness
-            ctx.strokeStyle = color.toString()
-            ctx.moveTo(X, Y)
-            ctx.lineTo(new_X, new_Y)
-            ctx.stroke()
+            mask.ctx.beginPath()
+            mask.ctx.lineWidth = mask.ratio * step_length
+            mask.ctx.strokeStyle = "#000"
+            mask.ctx.moveTo(mask.ratio*stroke_x, mask.ratio*stroke_y)
+            mask.ctx.lineTo(mask.ratio*new_stroke_x, mask.ratio*new_stroke_y)
+            mask.ctx.stroke()
             
             stroke_x = new_stroke_x
             stroke_y = new_stroke_y
-            strokeThickness *= options.hillshading_stroke_thickness_decay
           }
-        }
-        
-        pathStrokes.push(strokePath)
-        x = x2
-        y = y2
-      }
-
-      // Draw the strokes on the mask
-      pathStrokes.forEach(strokePath => {
-        stroke_x = strokePath[0][0]
-        stroke_y = strokePath[0][1]
-        for (let stroke_i=1; stroke_i<strokePath.length; stroke_i++){
-          let stroke_xy = strokePath[stroke_i]
-          let new_stroke_x = stroke_xy[0]
-          let new_stroke_y = stroke_xy[1]
-
-          // Draw line
-          mask.ctx.beginPath()
-          mask.ctx.lineWidth = mask.ratio * step_length
-          mask.ctx.strokeStyle = "#000"
-          mask.ctx.moveTo(mask.ratio*stroke_x, mask.ratio*stroke_y)
-          mask.ctx.lineTo(mask.ratio*new_stroke_x, mask.ratio*new_stroke_y)
-          mask.ctx.stroke()
-          
-          stroke_x = new_stroke_x
-          stroke_y = new_stroke_y
-        }
+        })
       })
-    })
+    }
 
     ns.report2("...done.")
 
@@ -1061,7 +1097,9 @@ newRenderer = function(){
       return Math.cos(Math.PI - aspect - sunAzimuth) * Math.sin(slope) * Math.sin(Math.PI * .5 - sunElevation) + 
         Math.cos(slope) * Math.cos(Math.PI * .5 - sunElevation);
     }
+    var hmax = 0
     var lPixelMap = new Float64Array((width+1) * (height+1))
+    var hPixelMap = new Float64Array((width+1) * (height+1))
     var dxPixelMap = new Float64Array((width+1) * (height+1))
     var dyPixelMap = new Float64Array((width+1) * (height+1))
     heatmapData.hPixelMap.forEach((h,i) => {
@@ -1083,6 +1121,9 @@ newRenderer = function(){
       var slope = getSlope(dx, dy, options.elevation_strength * Math.sqrt(width * height))
       var aspect = getAspect(dx, dy)
       var L = getReflectance(aspect, slope, options.hillshading_sun_azimuth, options.hillshading_sun_elevation)
+      var h = (hleft+hright+htop+hbottom)/4 || 0
+      hmax = Math.max(hmax, h)
+      hPixelMap[i] = h
       lPixelMap[i] = L
       dxPixelMap[i] = dx
       dyPixelMap[i] = dy
@@ -1090,6 +1131,7 @@ newRenderer = function(){
     ns.report2("...done.")
     ns._hillshadingData = {
       lPixelMap: lPixelMap,
+      hPixelMap: hPixelMap.map(h => {return h/hmax}),
       dxPixelMap: dxPixelMap,
       dyPixelMap: dyPixelMap,
       width: width,
