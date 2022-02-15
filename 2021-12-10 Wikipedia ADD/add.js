@@ -8,7 +8,7 @@ const d3 = require('d3')
 // Read file
 var gexf_string;
 try {
-    gexf_string = fs.readFileSync('data/thingsoflife.gexf', 'utf8');
+    gexf_string = fs.readFileSync('data/WikiNet_AI+ML0Algos_InTextRefs.gexf', 'utf8');
     console.log('GEXF file loaded');    
 } catch(e) {
     console.log('Error:', e.stack);
@@ -30,25 +30,25 @@ console.log('GEXF parsed');
 var settings = {}
 
 // Image size and resolution
-settings.image_width = 200 // in mm. Default: 200mm (fits in a A4 page)
-settings.image_height = 200
-settings.output_dpi = 300 // Dots per inch.
-settings.rendering_dpi = 300 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
+settings.image_width = 1000 // in mm. Default: 200mm (fits in a A4 page)
+settings.image_height = 1000
+settings.output_dpi = 900 // Dots per inch.
+settings.rendering_dpi = 900 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
 
 // Tiling:
 // Tiling allows to build images that would be otherwise too large.
 // You will have to assemble them by yourself.
-settings.tile_factor = 1 // Integer, default 1. Number of rows and columns of the grid of exported images.
+settings.tile_factor = 3 // Integer, default 1. Number of rows and columns of the grid of exported images.
 settings.tile_to_render = [0, 0] // Grid coordinates, as integers
 
 // Orientation & layout:
 settings.flip_x = false
 settings.flip_y = true
 settings.rotate = 0 // In degrees, clockwise
-settings.margin_top    = 18 // in mm
-settings.margin_right  = 54 // in mm
-settings.margin_bottom = 30 // in mm
-settings.margin_left   = 18 // in mm
+settings.margin_top    =  6 // in mm
+settings.margin_right  =  6 // in mm
+settings.margin_bottom = 12 // in mm
+settings.margin_left   =  6 // in mm
 
 // Layers:
 // Decide which layers are drawn.
@@ -59,106 +59,154 @@ settings.draw_network_shape_contour = false
 settings.draw_cluster_fills = false
 settings.draw_cluster_contours = false
 settings.draw_cluster_labels = false
-settings.draw_edges = false
-settings.draw_nodes = false
-settings.draw_node_labels = false
+settings.draw_edges = true
+settings.draw_nodes = true
+settings.draw_node_labels = true
 settings.draw_hillshading = true
-settings.draw_connected_closeness = false
-
-// Misc.
-settings.pen_size = 0.08 // in mm. Manga frame line: 0.5; Thinnest draw pen: 0.03
+settings.draw_connected_closeness = true
 
 // Layer: Background
-settings.background_color = "#ecd0a1"
+settings.background_color = "#ffffff"
 
 // Layer: Connected-closeness
-settings.cc_text_color = "#764301"
-settings.cc_text_border_color = "#ecd0a1"
+settings.cc_text_color = "#171637"
+settings.cc_text_border_color = "#ffffff"
 settings.cc_font_size = 8 // in pt
-settings.cc_line_color = "#764301"
-settings.cc_grid_line_color = "#daa96d"
+settings.cc_line_color = "#171637"
+settings.cc_grid_line_color = "#d5d3d7"
+settings.cc_info_margin_offset = 4.5 // In mm
 
 // Layer: Network shape
 //        (a potato for the whole network)
 // ...generic structure
-settings.network_shape_size = 2 // Range: more than 0, default to 1.
-settings.network_shape_smoothness = 15 // In mm (underlying blur)
-settings.network_shape_swelling = 0.95 // Range: 0.01 to 0.99 // Balanced: 0.5 // Acts on size
+settings.network_shape_size = 1 // Range: more than 0, default to 1.
+settings.network_shape_smoothness = 10 // In mm (underlying blur)
+settings.network_shape_swelling = 0.60 // Range: 0.01 to 0.99 // Balanced: 0.5 // Acts on size
 // ...shape fill
 settings.network_shape_fill_alpha = 0.2 // Opacity // Range from 0 to 1
-settings.network_shape_fill_color = "#FFF"
+settings.network_shape_fill_color = "#f4efec"
 // ...shape contour
-settings.network_shape_contour_thickness = 2 // Min: 1
-settings.network_shape_contour_alpha = 0.8 // Opacity // Range from 0 to 1
-settings.network_shape_contour_color = "#FFF"
+settings.network_shape_contour_thickness = .6 // Min: 1
+settings.network_shape_contour_alpha = 0.5 // Opacity // Range from 0 to 1
+settings.network_shape_contour_color = "#8B8B8B"
 
 // Layer: Clusters
 //        (a potato per modality of target attribute)
 // ...generic structure
 settings.cluster_all_modalities = false // By default, we only use modalities specified in "node_clusters"
-settings.cluster_shape_smoothness = 15 // In mm (underlying blur)
-settings.cluster_shape_size = 3 // Range: more than 0, default to 1.
+settings.cluster_node_size_margin = 3 // In mm
+settings.cluster_shape_smoothness = 10 // In mm (underlying blur)
+settings.cluster_shape_size = 1 // Range: more than 0, default to 1.
 settings.cluster_shape_swelling = 0.75 // Range: 0.01 to 0.99 // Balanced: 0.5 // Acts on size
 // ...cluster fills
 settings.cluster_fill_alpha = 0.3 // Opacity // Range from 0 to 1
 settings.cluster_fill_color_by_modality = true // if false, use default color below
 settings.cluster_fill_color_default = "#8B8B8B"
-settings.cluster_fill_overlay = true // A different blending mode
+settings.cluster_fill_overlay = false // A different blending mode
 // ...cluster contours
-settings.cluster_contour_thickness = .2 // Range: 0 to 10 or more
+settings.cluster_contour_thickness = .6 // Range: 0 to 10 or more
 settings.cluster_contour_alpha = 1 // Opacity // Range from 0 to 1
 settings.cluster_contour_color_by_modality = true // if false, use default color below
 settings.cluster_contour_color_default = "#8B8B8B"
 // ...cluster labels
 settings.cluster_label_colored = true
 settings.cluster_label_font_min_size = 14 // In pt
-settings.cluster_label_font_max_size = 24 // In pt
+settings.cluster_label_font_max_size = 14 // In pt
 settings.cluster_label_font_thickness = .45 // In mm
-settings.cluster_label_border_thickness = 2 // In mm
-settings.cluster_label_inner_color = "#FFF" // Note: here color is on the border
+settings.cluster_label_border_thickness = 1.6 // In mm
+settings.cluster_label_inner_color = "#ffffff" // Note: here color is on the border
 
 // Layer: Edges
 settings.edge_alpha = 1 // Opacity // Range from 0 to 1
-settings.edge_high_quality = false // Halo around nodes // Time-consuming
-settings.edge_color = "#4f432f"
+settings.edge_curved = true
+settings.edge_thickness = 0.03 // in mm
+settings.edge_high_quality = true // Halo around nodes // Time-consuming
+settings.edge_color = "#b6b8c4"
+settings.edge_color_from_nodes = true
+settings.edge_weight_as_thickness = true
 
 // Layer: Nodes
-settings.adjust_voronoi_range = 100 // Factor // Larger node halo
-settings.node_size = 0.8 // Factor to adjust the nodes drawing size
-settings.node_stroke_color = "#4f432f"
-settings.node_fill_color = "#ecd0a1"
+settings.adjust_voronoi_range = 80 // Factor // Larger node halo
+settings.node_size = .8 // Factor to adjust the nodes drawing size
+settings.node_color_original = false // Use the original node color
+settings.node_color_from_clusters = true
+settings.node_stroke_color = "#171637"
+settings.node_stroke_width = 0.05 // in mm
+settings.node_fill_color = "#171637"
 
 // Layer: Node labels
-settings.label_color = "#4f432f"
-settings.label_max_length = 42 // Number of characters before truncate. Infinity is a valid value.
-settings.label_font_family = "Book Antiqua"
-settings.label_font_min_size = 8 // in pt
-settings.label_font_max_size = 8  // in pt
-settings.label_font_thickness = .15
-settings.label_border_thickness = .8 // in mm
-settings.label_spacing_offset = 1.5 // in mm (prevents label overlap)
-settings.label_border_color = settings.background_color
+settings.label_color = "#171637"
+settings.label_color_from_nodes = true
+settings.label_max_length = 64 // Number of characters before truncate. Infinity is a valid value.
+settings.label_font_family = "Raleway"
+settings.label_font_min_size = 5 // in pt
+settings.label_font_max_size = 14  // in pt
+settings.label_font_thickness = .2
+settings.label_border_thickness = .6 // in mm
+settings.label_spacing_offset = 0.6 // in mm (prevents label overlap)
+settings.label_border_color = "rgba(255, 255, 255, .8)"
+
+// Layer: Text legend extension
+settings.legend_background_color = "#FFF"
+settings.legend_font_family = "Raleway"
+settings.legend_font_size = 11 // in pt
+settings.legend_font_color = "#171637"
+settings.legend_text = "(insert legend here)"
 
 // Main clusters and color code:
 // Clusters are defined by the modalities of a given attribute.
 // This specifies which is this attribute, and which
 // modalities have which colors. You can generate this
 // JSON object with the PREPARE script.
-settings.node_clusters = {}
-
+settings.node_clusters = {
+  "attribute_id": "modularity_class",
+  "modalities": {
+    "0": {
+      "label": "0",
+      "count": 1378,
+      "color": "#b9a2ce"
+    },
+    "1": {
+      "label": "1",
+      "count": 1093,
+      "color": "#ce6028"
+    },
+    "3": {
+      "label": "3",
+      "count": 1761,
+      "color": "#6fc5a4"
+    },
+    "9": {
+      "label": "9",
+      "count": 1246,
+      "color": "#658ec9"
+    },
+    "12": {
+      "label": "12",
+      "count": 1319,
+      "color": "#e8a74b"
+    },
+    "29": {
+      "label": "29",
+      "count": 1495,
+      "color": "#f26b6e"
+    }
+  },
+  "default_color": "#9d9b99"
+}
 // Advanced settings
-settings.voronoi_range = 4 // Halo size in mm
+settings.voronoi_range = 3 // Halo size in mm
 settings.voronoi_resolution_max = 1 * Math.pow(10, 7) // in pixel. 10^7 still quick, 10^8 better quality 
 settings.heatmap_resolution_max = 1 * Math.pow(10, 5) // in pixel. 10^5 quick. 10^7 nice but super slow.
 settings.heatmap_spreading = 12 // in mm
 
 // Experimental stuff
-settings.hillshading_strength = 12 // Elevation factor
-settings.hillshading_color = "#4f432f"
-settings.hillshading_alpha = 1. // Opacity
+settings.hillshading_strength = 60
+settings.hillshading_color = "#DDDDDD"
+settings.hillshading_alpha = .3 // Opacity
 settings.hillshading_sun_azimuth = Math.PI * 0.6 // angle in radians
-settings.hillshading_sun_elevation = Math.PI * 0.4 // angle in radians
-settings.poisson_disc_radius = .666 // in mm
+settings.hillshading_sun_elevation = Math.PI * 0.35 // angle in radians
+settings.poisson_disc_radius = .3 // in mm
 
 /// (END OF SETTINGS)
 
@@ -189,14 +237,6 @@ newRenderer = function(){
       )
     }
 
-    // Draw Hillshading
-    if (ns.settings.draw_hillshading) {
-      layeredImage = ns.drawLayerOnTop(layeredImage,
-        ns.drawHillshadingLines(ns.settings)
-        //ns.drawHillshadingGradient(ns.settings)
-      )
-    }
-
     // Draw network shape fill
     if (ns.settings.draw_network_shape_fill) {
       layeredImage = ns.drawLayerOnTop(layeredImage,
@@ -215,7 +255,6 @@ newRenderer = function(){
     if (ns.settings.draw_edges) {
       layeredImage = ns.drawLayerOnTop(layeredImage,
         ns.drawEdgesLayer(ns.settings)
-        //ns.drawEdgesExperimentLayer(ns.settings)
       )
     }
 
@@ -269,22 +308,66 @@ newRenderer = function(){
       )
     }
 
+    // Draw Hillshading
+    if (ns.settings.draw_hillshading) {
+      layeredImage = ns.overlayLayer(layeredImage,
+        //ns.drawHillshadingLines(ns.settings),
+        ns.drawHillshadingGradient(ns.settings),
+        "multiply"
+      )
+    }
+
+    // Draw text legend extension
+    var legendImage
+    if (ns.settings.draw_text_legend_extension) {
+      /*layeredImage = ns.drawLayerOnTop(layeredImage,
+        ns.drawTextLegend(ns.settings)
+      )*/
+      legendImage = ns.drawTextLegend(ns.settings)
+    }
+
     // Build final canvas
+    var finalMapCanvas
     var renderingCanvas = ns.createCanvas()
     renderingCanvas.getContext("2d").putImageData(layeredImage, 0, 0)
     if (ns.settings.output_dpi == ns.settings.rendering_dpi) {
-      return renderingCanvas
+      finalMapCanvas = renderingCanvas
+    } else {
+      var resizedCanvas = ns.createCanvas()
+      let outputWidth = Math.floor(ns.settings.image_width * ns.settings.output_dpi * 0.0393701 / ns.settings.tile_factor)
+      let outputHeight = Math.floor(ns.settings.image_height * ns.settings.output_dpi * 0.0393701 / ns.settings.tile_factor)
+      resizedCanvas.width = outputWidth
+      resizedCanvas.height = outputHeight
+      let ctx = resizedCanvas.getContext("2d")
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = "high"
+      ctx.drawImage(renderingCanvas, 0, 0, outputWidth, outputHeight);
+      finalMapCanvas = resizedCanvas
     }
-    var canvas = ns.createCanvas()
-    let outputWidth = Math.floor(ns.settings.image_width * ns.settings.output_dpi * 0.0393701 / ns.settings.tile_factor)
-    let outputHeight = Math.floor(ns.settings.image_height * ns.settings.output_dpi * 0.0393701 / ns.settings.tile_factor)
-    canvas.width = outputWidth
-    canvas.height = outputHeight
-    let ctx = canvas.getContext("2d")
-    ctx.imageSmoothingEnabled = true
-    ctx.imageSmoothingQuality = "high"
-    ctx.drawImage(renderingCanvas, 0, 0, outputWidth, outputHeight);
-    return canvas
+
+    if (legendImage) {
+      // Create Legend Canvas
+      var legendCanvas = document.createElement('canvas')
+      legendCanvas.width = legendImage.width
+      legendCanvas.height = legendImage.height
+      legendCanvas.getContext("2d").putImageData(legendImage, 0, 0)
+
+      // Create concatenation canvas
+      let concatCanvas = document.createElement('canvas')
+      concatCanvas.width = finalMapCanvas.width
+      concatCanvas.height = finalMapCanvas.height + legendCanvas.height
+
+      let ctx = concatCanvas.getContext("2d")
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = "high"
+      ctx.drawImage(finalMapCanvas, 0, 0, finalMapCanvas.width, finalMapCanvas.height);
+      ctx.drawImage(legendCanvas, 0, finalMapCanvas.height, legendCanvas.width, legendCanvas.height);
+
+      return concatCanvas
+
+    } else {
+      return finalMapCanvas
+    }
   }
 
   // Render and save
@@ -371,707 +454,6 @@ newRenderer = function(){
 
   /// FUNCTIONS
 
-  ns.getPoissonDiscSampling = function() {
-    // Cache
-    if (ns._poissonDiscSampling) {
-      return ns._poissonDiscSampling
-    }
-
-    ns.log2("Precompute poisson disc sample...")
-
-    // For consistency, we sample on the whole space
-    var dim = {
-      w: Math.floor(ns.settings.image_width * ns.settings.rendering_dpi * 0.0393701),
-      h: Math.floor(ns.settings.image_height * ns.settings.rendering_dpi * 0.0393701)
-    }
-
-    var radius = ns.settings.poisson_disc_radius || 5 // in mm
-    var r = radius * ns.settings.rendering_dpi * 0.0393701
-
-    var sampler = poissonDiscSampler(dim.w, dim.h, r)
-    var points = []
-    var s
-    while (s = sampler()) {points.push(s)}
-    ns._poissonDiscSampling = points
-    ns.report2("...done.")
-    return points
-
-    // Internal methods, from https://gist.github.com/mbostock/19168c663618b7f07158
-    function poissonDiscSampler(width, height, radius) {
-      var k = 30, // maximum number of samples before rejection
-          radius2 = radius * radius,
-          R = 3 * radius2,
-          cellSize = radius * Math.SQRT1_2,
-          gridWidth = Math.ceil(width / cellSize),
-          gridHeight = Math.ceil(height / cellSize),
-          grid = new Array(gridWidth * gridHeight),
-          queue = [],
-          queueSize = 0,
-          sampleSize = 0;
-
-      return function() {
-        if (!sampleSize) return sample(Math.random() * width, Math.random() * height);
-
-        // Pick a random existing sample and remove it from the queue.
-        while (queueSize) {
-          var i = Math.random() * queueSize | 0,
-              s = queue[i];
-
-          // Make a new candidate between [radius, 2 * radius] from the existing sample.
-          for (var j = 0; j < k; ++j) {
-            var a = 2 * Math.PI * Math.random(),
-                r = Math.sqrt(Math.random() * R + radius2),
-                x = s[0] + r * Math.cos(a),
-                y = s[1] + r * Math.sin(a);
-
-            // Reject candidates that are outside the allowed extent,
-            // or closer than 2 * radius to any existing sample.
-            if (0 <= x && x < width && 0 <= y && y < height && far(x, y)) return sample(x, y);
-          }
-
-          queue[i] = queue[--queueSize];
-          queue.length = queueSize;
-        }
-      };
-
-      function far(x, y) {
-        var i = x / cellSize | 0,
-            j = y / cellSize | 0,
-            i0 = Math.max(i - 2, 0),
-            j0 = Math.max(j - 2, 0),
-            i1 = Math.min(i + 3, gridWidth),
-            j1 = Math.min(j + 3, gridHeight);
-
-        for (j = j0; j < j1; ++j) {
-          var o = j * gridWidth;
-          for (i = i0; i < i1; ++i) {
-            if (s = grid[o + i]) {
-              var s,
-                  dx = s[0] - x,
-                  dy = s[1] - y;
-              if (dx * dx + dy * dy < radius2) return false;
-            }
-          }
-        }
-
-        return true;
-      }
-
-      function sample(x, y) {
-        var s = [x, y];
-        queue.push(s);
-        grid[gridWidth * (y / cellSize | 0) + (x / cellSize | 0)] = s;
-        ++sampleSize;
-        ++queueSize;
-        return s;
-      }
-    }
-  }
-
-  ns.shuffleArray = function(array) {
-    let currentIndex = array.length,  randomIndex;
-
-    // While there remain elements to shuffle...
-    while (currentIndex != 0) {
-
-      // Pick a remaining element...
-      randomIndex = Math.floor(Math.random() * currentIndex);
-      currentIndex--;
-
-      // And swap it with the current element.
-      [array[currentIndex], array[randomIndex]] = [
-        array[randomIndex], array[currentIndex]];
-    }
-
-    return array;
-  }
-
-  ns.drawHillshadingLines = function(options) {
-    ns.log("Draw Hillshading Lines...")
-    
-    var options = options || {}
-    options.pen_size = options.pen_size || .2 // in mm
-    // options.hillshading_alpha = options.hillshading_alpha || .5
-    options.hillshading_color = options.hillshading_color || "#000"
-    options.random_seed = options.random_seed || 666 // Randomness is seeded for tiling consistency
-    options.hillshading_area_max_thickness = 5 // in mm
-    options.hillshading_area_step = .5 // in mm
-    options.hillshading_area_max_length = 40 // in mm
-    options.hillshading_area_min_length = 8 // in mm
-    options.hillshading_area_slope_length = 15 // in mm
-    options.hillshading_stroke_overlap = 0.5 // in mm
-    options.hillshading_stroke_thickness_ratio = 1.5
-    options.hillshading_stroke_min_length = .25 // in mm
-    options.hillshading_stroke_max_length = 30 // in mm
-    options.hillshading_stroke_step_length = .4 // in mm
-    options.hillshading_stroke_thickness_decay = .95 // percentage in [0,1]
-    options.hillshading_stroke_opacity_jitter = .6 // percentage in [0,1]
-    options.hillshading_stroke_spacing_jitter = .2 // percentage in [0,1]
-    options.hillshading_stroke_angle_jitter = Math.PI * 0.1
-    options.hillshading_stroke_density_max = 5 // in strokes per mm
-    options.hillshading_stroke_density_min = .5 // in strokes per mm
-    options.hillshading_shading_threshold = .5 // percentage in [0,1] where shading is considered null
-    options.mask_resolution = options.mask_resolution || 1 * Math.pow(10, 6) // 1000 x 1000 pixels
-    // Monitoring
-    options.draw_mask = false // default: false. Use for monitoring purpose only.
-    options.draw_additional_info = false // default: false. Use for monitoring purpose only.
-    options.stop_after_areas = false // default: false. Use for monitoring purpose only.
-    options.draw_hillshading = true // default: true. Use for monitoring purpose only.
-
-    var g = ns.g
-    var dim = ns.getRenderingPixelDimensions()
-    var ctx = ns.createCanvas().getContext("2d")
-    ns.scaleContext(ctx)
-
-    /// Unpack hillshading data
-    var shadingData = ns.getHillshadingData()
-    
-    // Unpack hillshading
-    var ratio = 1/shadingData.ratio
-    var lPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
-    var hPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
-    var dxPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
-    var dyPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
-    var xu, yu, xp, xp1, xp2, dx, yp, yp1, yp2, dy, ip_top_left, ip_top_right, ip_bottom_left, ip_bottom_right
-    for (var i=0; i<lPixelMap.length; i++) {
-      // unpacked coordinates
-      xu = i%(dim.w * ns.settings.tile_factor)
-      yu = (i-xu)/(dim.w * ns.settings.tile_factor)
-      // packed coordinates
-      xp = xu/ratio
-      xp1 = Math.max(0, Math.min(shadingData.width, Math.floor(xp)))
-      xp2 = Math.max(0, Math.min(shadingData.width, Math.ceil(xp)))
-      dx = (xp-xp1)/(xp2-xp1) || 0
-      yp = yu/ratio
-      yp1 = Math.max(0, Math.min(shadingData.height, Math.floor(yp)))
-      yp2 = Math.max(0, Math.min(shadingData.height, Math.ceil(yp)))
-      dy = (yp-yp1)/(yp2-yp1) || 0
-      // coordinates of the 4 pixels necessary to rescale
-      ip_top_left = xp1 + (shadingData.width+1) * yp1
-      ip_top_right = xp2 + (shadingData.width+1) * yp1
-      ip_bottom_left = xp1 + (shadingData.width+1) * yp2
-      ip_bottom_right = xp2 + (shadingData.width+1) * yp2
-      // Rescaling (gradual blending between the 4 pixels)
-      lPixelMap[i] =
-          (1-dx) * (
-            (1-dy) * shadingData.lPixelMap[ip_top_left]
-            +  dy  * shadingData.lPixelMap[ip_bottom_left]
-          )
-        + dx * (
-            (1-dy) * shadingData.lPixelMap[ip_top_right]
-            +  dy  * shadingData.lPixelMap[ip_bottom_right]
-          )
-      hPixelMap[i] =
-          (1-dx) * (
-            (1-dy) * shadingData.hPixelMap[ip_top_left]
-            +  dy  * shadingData.hPixelMap[ip_bottom_left]
-          )
-        + dx * (
-            (1-dy) * shadingData.hPixelMap[ip_top_right]
-            +  dy  * shadingData.hPixelMap[ip_bottom_right]
-          )
-      dxPixelMap[i] =
-          (1-dx) * (
-            (1-dy) * shadingData.dxPixelMap[ip_top_left]
-            +  dy  * shadingData.dxPixelMap[ip_bottom_left]
-          )
-        + dx * (
-            (1-dy) * shadingData.dxPixelMap[ip_top_right]
-            +  dy  * shadingData.dxPixelMap[ip_bottom_right]
-          )
-      dyPixelMap[i] =
-          (1-dx) * (
-            (1-dy) * shadingData.dyPixelMap[ip_top_left]
-            +  dy  * shadingData.dyPixelMap[ip_bottom_left]
-          )
-        + dx * (
-            (1-dy) * shadingData.dyPixelMap[ip_top_right]
-            +  dy  * shadingData.dyPixelMap[ip_bottom_right]
-          )
-    }
-
-    // Create mask canvas
-    var mask = {}
-    if (dim.w*dim.h>options.mask_resolution) {
-      mask.ratio = Math.sqrt(options.mask_resolution/(dim.w*dim.h))
-      mask.width = Math.floor(mask.ratio*dim.w)
-      mask.height = Math.floor(mask.ratio*dim.h)
-    } else {
-      mask.ratio = 1
-      mask.width = dim.w
-      mask.height = dim.h
-    }
-    console.log("Hillshading mask ratio:",mask.ratio,"- Dimensions: "+mask.width+" x "+mask.height)
-    mask.canvas = ns.createCanvas()
-    mask.canvas.width = mask.width
-    mask.canvas.height = mask.height
-    mask.ctx = mask.canvas.getContext("2d")
-    mask.ctx.lineCap = "round"
-    mask.ctx.lineJoin = "round"
-    ns.paintAll(mask.ctx, '#FFF')
-
-    ns.log2("Draw hillshade...")
-    const thickness = ns.mm_to_px(options.pen_size)
-    const areaMaxThickness = ns.mm_to_px(options.hillshading_area_max_thickness)*mask.ratio
-    const step_length = ns.mm_to_px(options.hillshading_area_step)
-    var path, x, y, x2, y2
-    var paths = []
-    var points = ns.shuffleArray(ns.getPoissonDiscSampling())
-
-    // Index points by elevation
-    points.forEach(p => {
-      let x = p[0]
-      let y = p[1]
-      let i = Math.floor(x) + Math.floor(y)*dim.w*ns.settings.tile_factor
-      let h = +hPixelMap[i]
-      if (isNaN(h)) {
-        h = 0
-      }
-      p[2] = h
-    })
-
-    // Sort points by elevation
-    points = points.sort(function(a, b){ return +(b[2]-a[2])})
-
-    // For each point, find a path
-    points.forEach(xy => {
-      x = Math.floor(xy[0])
-      y = Math.floor(xy[1])
-
-      // Test mask
-      var pixel = mask.ctx.getImageData(Math.floor(x*mask.ratio), Math.floor(y*mask.ratio), 1, 1).data
-      var pixelIsFree = pixel[0] >= 230
-      if (options.draw_additional_info) {
-        if (pixelIsFree) {
-          ctx.fillStyle = "#0F0";
-          ctx.beginPath();
-          ctx.arc(x, y, 1.5, 0, 2 * Math.PI);
-          ctx.fill();
-        } else {
-          ctx.fillStyle = "#F00";
-          ctx.beginPath();
-          ctx.arc(x, y, 1.5, 0, 2 * Math.PI);
-          ctx.fill();
-        }
-      }
-
-      if (!pixelIsFree) { return }
-
-      // Determine the draw area of the path
-      path = []
-      let flag = true
-      let steps = ns.mm_to_px(options.hillshading_area_max_length) / step_length
-      let slope_steps = ns.mm_to_px(options.hillshading_area_slope_length) / step_length
-      path.push([x, y])
-      while (flag && steps-->0) {
-        let i = Math.floor(x) + Math.floor(y)*dim.w*ns.settings.tile_factor
-        let dx = -dyPixelMap[i]
-        let dy = dxPixelMap[i]
-        let ratio = step_length / Math.sqrt(dx*dx+dy*dy)
-        x2 = x + dx*ratio
-        y2 = y + dy*ratio
-
-        // Test mask
-        if (x2<0 || x2>=dim.w || y2<0 || y2>=dim.h) {
-          flag = false
-        } else {
-          let pixel = mask.ctx.getImageData(Math.floor(x2*mask.ratio), Math.floor(y2*mask.ratio), 1, 1).data
-          if (pixel[0]<230) {
-            // End the path
-            flag = false
-          }
-        }
-
-        if (flag) {
-          path.push([x2, y2])
-        }
-
-        x = x2
-        y = y2
-      }
-
-      let steps_min = ns.mm_to_px(options.hillshading_area_min_length) / step_length
-      if (path.length >=steps_min) {
-
-        // Draw mask
-        x = path[0][0]
-        y = path[0][1]
-        for (let i=1; i<path.length; i++) {
-          x2 = path[i][0]
-          y2 = path[i][1]
-
-          let size = Math.sqrt(1 - Math.max(Math.max(0, slope_steps - (path.length - i)), slope_steps - i)/slope_steps)
-
-          let dx = mask.ratio*x2 - mask.ratio*x
-          let dy = mask.ratio*y2 - mask.ratio*y
-          let dd = Math.sqrt(dx*dx+dy*dy)
-          dx/=dd
-          dy/=dd
-          mask.ctx.beginPath()
-          mask.ctx.lineWidth = size*areaMaxThickness
-          mask.ctx.strokeStyle = "#000"
-          mask.ctx.moveTo(mask.ratio*x + dy*0.5*size*areaMaxThickness, mask.ratio*y - dx*0.5*size*areaMaxThickness)
-          mask.ctx.lineTo(mask.ratio*x2 + dy*0.5*size*areaMaxThickness, mask.ratio*y2 - dx*0.5*size*areaMaxThickness)
-          mask.ctx.stroke()
-
-          // Draw actual drawing for monitoring
-          if (options.draw_additional_info) {
-            ctx.lineCap = "round"
-            ctx.lineJoin = "round"
-            ctx.beginPath()
-            ctx.lineWidth = 2
-            ctx.strokeStyle = "#66F"
-            ctx.moveTo(x, y)
-            ctx.lineTo(x2, y2)
-            ctx.stroke()
-          }
-
-          x = x2
-          y = y2
-        }
-        paths.push(path)
-      }
-    })
-
-    if (!options.stop_after_areas) {
-
-      // Eliminate paths that are too short
-      const minPathLength = ns.mm_to_px(5) / step_length
-      paths = paths.filter(path => {
-        return path.length >= minPathLength
-      })
-
-      // Reset mask for round 2 (strokes)
-      ns.paintAll(mask.ctx, '#FFF')
-      const minStrokeLength = Math.ceil(ns.mm_to_px(options.hillshading_stroke_min_length))
-      paths.forEach(path => {
-        x = path[0][0]
-        y = path[0][1]
-        for (let i=1; i<path.length; i++) {
-          x2 = path[i][0]
-          y2 = path[i][1]
-
-          mask.ctx.beginPath()
-          mask.ctx.lineWidth = mask.ratio*minStrokeLength/2
-          mask.ctx.strokeStyle = "#000"
-          mask.ctx.moveTo(mask.ratio*x , mask.ratio*y )
-          mask.ctx.lineTo(mask.ratio*x2, mask.ratio*y2)
-          mask.ctx.stroke()
-
-          x = x2
-          y = y2
-        }
-      })
-
-      var lightnessToStrokeDensity = function(l) {
-        let shading = 1-l
-        shading = Math.max(0, shading - options.hillshading_shading_threshold) * (1-options.hillshading_shading_threshold)
-        shading = Math.pow(shading, 2)
-        let density = shading * options.hillshading_stroke_density_max
-        return density
-      }
-
-      // Rewrite each path to have stroke density represent lightness
-      // (each path point is one stroke)
-      // Rewrite path resolution
-      const minStrokeSpacing = ns.mm_to_px(1/options.hillshading_stroke_density_min)
-      paths = paths.map(path => {
-        let newPath, x, y, x2, y2, dx, dy, dd, pi, l, strokeSpacing, lengthOffset
-        x = path[0][0]
-        y = path[0][1]
-        newPath = [] // [[x, y]] // Note: we do not add the first to avoid some glitches
-        pi = Math.floor(x) + Math.floor(y)*dim.w*ns.settings.tile_factor
-        l = lPixelMap[pi] // lightness
-        strokeSpacing = 1/lightnessToStrokeDensity(l)
-        lengthOffset = 0
-        for (let i=1; i<path.length; i++) {
-          x2 = path[i][0]
-          y2 = path[i][1]
-          dx = x2-x
-          dy = y2-y
-          dd = Math.sqrt(dx*dx+dy*dy)
-          dx /= dd
-          dy /= dd
-          while (lengthOffset < dd) {
-            lengthOffset += strokeSpacing * (1 - 0.5 * options.hillshading_stroke_spacing_jitter + options.hillshading_stroke_spacing_jitter * bsRandom())
-            if (strokeSpacing<minStrokeSpacing) {
-              newPath.push([x+lengthOffset*dx, y+lengthOffset*dy])
-            }
-          }
-          lengthOffset -= dd
-          x = x2
-          y = y2
-          pi = Math.floor(x) + Math.floor(y)*dim.w*ns.settings.tile_factor
-          l = lPixelMap[pi] // lightness
-          strokeSpacing = 1/lightnessToStrokeDensity(l)
-        }
-        return newPath
-      })
-      // Eliminate paths that do not have enough steps
-      paths = paths.filter(path => {return path.length > 10})
-
-      // Draw the strokes for each path
-      const maxStrokeLength = Math.floor(ns.mm_to_px(options.hillshading_stroke_max_length))
-      paths.forEach(path => {
-        x = path[0][0]
-        y = path[0][1]
-        let pathStrokes = []
-        for (let i=1; i<path.length; i++) {
-          x2 = path[i][0]
-          y2 = path[i][1]
-
-          // Gradually draw (compute) the path
-          let flag = true
-          let stroke_x = x
-          let stroke_y = y
-          let strokeStep = ns.mm_to_px(options.hillshading_stroke_step_length)
-          let length = strokeStep
-          let overlapSteps = ns.mm_to_px(options.hillshading_stroke_overlap)/strokeStep
-          let strokePath = [[stroke_x, stroke_y]]
-          while (flag || (overlapSteps>0) || length < minStrokeLength) {
-            if (!flag) {
-              overlapSteps--
-            }
-            let pi = Math.floor(stroke_x) + Math.floor(stroke_y)*dim.w*ns.settings.tile_factor
-            let dx = dxPixelMap[pi]
-            let dy = dyPixelMap[pi]
-            let angle = Math.atan2(dy, dx) + options.hillshading_stroke_angle_jitter*(bsRandom()-.5)            
-
-            stroke_x += strokeStep*Math.cos(angle)
-            stroke_y += strokeStep*Math.sin(angle)
-            length += strokeStep
-
-            strokePath.push([stroke_x, stroke_y])
-
-            // Test mask
-            if (stroke_x<0 || stroke_x>=dim.w || stroke_y<0 || stroke_y>=dim.h) {
-              flag = false
-            } else if (length > maxStrokeLength) {
-              flag = false
-            } else if (length > minStrokeLength){
-              let pixel = mask.ctx.getImageData(Math.floor(stroke_x*mask.ratio), Math.floor(stroke_y*mask.ratio), 1, 1).data
-              if (pixel[0]<230) {
-                // End the path
-                flag = false
-              }
-            }
-          }
-
-          // Draw the stroke
-          if (options.draw_hillshading) {
-            let strokeThickness = options.hillshading_stroke_thickness_ratio * thickness
-            stroke_x = strokePath[0][0]
-            stroke_y = strokePath[0][1]
-            for (let stroke_i=1; stroke_i<strokePath.length; stroke_i++){
-              let stroke_xy = strokePath[stroke_i]
-              let new_stroke_x = stroke_xy[0]
-              let new_stroke_y = stroke_xy[1]
-
-              let color = d3.color(options.hillshading_color)
-              color.opacity = (1-options.hillshading_stroke_opacity_jitter) + options.hillshading_stroke_opacity_jitter*bsRandom()
-
-              // Draw line
-              let X = stroke_x/ns.settings.tile_factor
-              let Y = stroke_y/ns.settings.tile_factor
-              let new_X = new_stroke_x/ns.settings.tile_factor
-              let new_Y = new_stroke_y/ns.settings.tile_factor
-              ctx.beginPath()
-              ctx.lineWidth = strokeThickness
-              ctx.strokeStyle = color.toString()
-              ctx.moveTo(X, Y)
-              ctx.lineTo(new_X, new_Y)
-              ctx.stroke()
-              
-              stroke_x = new_stroke_x
-              stroke_y = new_stroke_y
-              strokeThickness *= options.hillshading_stroke_thickness_decay
-            }
-          }
-          
-          pathStrokes.push(strokePath)
-          x = x2
-          y = y2
-        }
-
-        // Draw the strokes on the mask
-        pathStrokes.forEach(strokePath => {
-          stroke_x = strokePath[0][0]
-          stroke_y = strokePath[0][1]
-          for (let stroke_i=1; stroke_i<strokePath.length; stroke_i++){
-            let stroke_xy = strokePath[stroke_i]
-            let new_stroke_x = stroke_xy[0]
-            let new_stroke_y = stroke_xy[1]
-
-            // Draw line
-            mask.ctx.beginPath()
-            mask.ctx.lineWidth = mask.ratio * step_length
-            mask.ctx.strokeStyle = "#000"
-            mask.ctx.moveTo(mask.ratio*stroke_x, mask.ratio*stroke_y)
-            mask.ctx.lineTo(mask.ratio*new_stroke_x, mask.ratio*new_stroke_y)
-            mask.ctx.stroke()
-            
-            stroke_x = new_stroke_x
-            stroke_y = new_stroke_y
-          }
-        })
-      })
-    }
-
-    ns.report2("...done.")
-
-    if (options.draw_mask) {
-      let canvas = ns.createCanvas()
-      let outputCtx = canvas.getContext("2d")
-      outputCtx.imageSmoothingEnabled = true
-      outputCtx.imageSmoothingQuality = "high"
-      // Draw mask
-      outputCtx.drawImage(mask.ctx.canvas, 0, 0, ctx.canvas.width, ctx.canvas.height)
-      // Draw normal stuff
-      outputCtx.drawImage(ctx.canvas, 0, 0, ctx.canvas.width, ctx.canvas.height)
-      ctx = outputCtx
-    }
-
-    ns.report("...done.")
-    return ns.multiplyAlpha(
-      ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height),
-      options.hillshading_alpha
-    )
-    // Bad seeded randomness
-    function bsRandom() {
-      var x = Math.sin(options.random_seed++) * 10000;
-      return x - Math.floor(x);
-    }
-  }
-
-  ns.drawHillshadingLines_old = function(options) {
-    ns.log("Draw Hillshading Lines...")
-    
-    var options = options || {}
-    options.pen_size = options.pen_size || .2 // in mm
-    options.hillshading_alpha = options.hillshading_alpha || .5
-    options.hillshading_color = options.hillshading_color || "#000"
-    options.hillshading_stroke_angle_jitter = (options.hillshading_stroke_angle_jitter===undefined)?(Math.PI*.1):(options.hillshading_stroke_angle_jitter)
-    options.random_seed = options.random_seed || 666 // Randomness is seeded for tiling consistency
-
-    var g = ns.g
-    var dim = ns.getRenderingPixelDimensions()
-    var ctx = ns.createCanvas().getContext("2d")
-    ns.scaleContext(ctx)
-
-    /// Unpack hillshading data
-    var shadingData = ns.getHillshadingData()
-    
-    // Unpack hillshading
-    var ratio = 1/shadingData.ratio
-    var lPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
-    var dxPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
-    var dyPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
-    var xu, yu, xp, xp1, xp2, dx, yp, yp1, yp2, dy, ip_top_left, ip_top_right, ip_bottom_left, ip_bottom_right
-    for (var i=0; i<lPixelMap.length; i++) {
-      // unpacked coordinates
-      xu = i%(dim.w * ns.settings.tile_factor)
-      yu = (i-xu)/(dim.w * ns.settings.tile_factor)
-      // packed coordinates
-      xp = xu/ratio
-      xp1 = Math.max(0, Math.min(shadingData.width, Math.floor(xp)))
-      xp2 = Math.max(0, Math.min(shadingData.width, Math.ceil(xp)))
-      dx = (xp-xp1)/(xp2-xp1) || 0
-      yp = yu/ratio
-      yp1 = Math.max(0, Math.min(shadingData.height, Math.floor(yp)))
-      yp2 = Math.max(0, Math.min(shadingData.height, Math.ceil(yp)))
-      dy = (yp-yp1)/(yp2-yp1) || 0
-      // coordinates of the 4 pixels necessary to rescale
-      ip_top_left = xp1 + (shadingData.width+1) * yp1
-      ip_top_right = xp2 + (shadingData.width+1) * yp1
-      ip_bottom_left = xp1 + (shadingData.width+1) * yp2
-      ip_bottom_right = xp2 + (shadingData.width+1) * yp2
-      // Rescaling (gradual blending between the 4 pixels)
-      lPixelMap[i] =
-          (1-dx) * (
-            (1-dy) * shadingData.lPixelMap[ip_top_left]
-            +  dy  * shadingData.lPixelMap[ip_bottom_left]
-          )
-        + dx * (
-            (1-dy) * shadingData.lPixelMap[ip_top_right]
-            +  dy  * shadingData.lPixelMap[ip_bottom_right]
-          )
-      dxPixelMap[i] =
-          (1-dx) * (
-            (1-dy) * shadingData.dxPixelMap[ip_top_left]
-            +  dy  * shadingData.dxPixelMap[ip_bottom_left]
-          )
-        + dx * (
-            (1-dy) * shadingData.dxPixelMap[ip_top_right]
-            +  dy  * shadingData.dxPixelMap[ip_bottom_right]
-          )
-      dyPixelMap[i] =
-          (1-dx) * (
-            (1-dy) * shadingData.dyPixelMap[ip_top_left]
-            +  dy  * shadingData.dyPixelMap[ip_bottom_left]
-          )
-        + dx * (
-            (1-dy) * shadingData.dyPixelMap[ip_top_right]
-            +  dy  * shadingData.dyPixelMap[ip_bottom_right]
-          )
-    }
-
-    var points = ns.getPoissonDiscSampling()
-
-    ns.log2("Draw hillshade...")
-    var thickness = ns.mm_to_px(options.pen_size)
-    var len = ns.mm_to_px(.3)
-    var hillshadeGradient = function(d) {
-      const thresh = .15
-      if (d < thresh) return 0
-      d = (d-thresh)/(1-thresh)
-      return Math.pow(d, 2)
-    }
-    ctx.lineCap = "round"
-    ctx.lineJoin = "round"
-    points.forEach(xy => {
-      let x = Math.floor(xy[0])
-      let y = Math.floor(xy[1])
-      let i = x + y*dim.w*ns.settings.tile_factor
-      let dx = dxPixelMap[i]
-      let dy = dyPixelMap[i]
-      let X = x/ns.settings.tile_factor
-      let Y = y/ns.settings.tile_factor
-      let angle = Math.atan2(dy, dx) + options.hillshading_stroke_angle_jitter*(bsRandom()-.5)
-      let l = lPixelMap[i]
-      let hillshadeIntensity = hillshadeGradient(1-l)
-      let r = len * (1 + .3 * hillshadeIntensity)
-      
-      if (hillshadeIntensity > .03 && bsRandom() < hillshadeIntensity) {
-        // Line
-        ctx.beginPath()
-        ctx.lineWidth = thickness * (1 + 1.2 * hillshadeIntensity)
-        ctx.strokeStyle = options.hillshading_color
-        ctx.moveTo(X-r*Math.cos(angle), Y-r*Math.sin(angle))
-        ctx.lineTo(X+r*Math.cos(angle), Y+r*Math.sin(angle))
-        //ctx.moveTo(x-5000*dx, y-5000*dy)
-        //ctx.lineTo(x+5000*dx, y+5000*dy)
-        ctx.stroke()
-      }
-
-    })
-
-    ns.report2("...done.")
-
-    ns.report("...done.")
-    return ns.multiplyAlpha(
-      ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height),
-      options.hillshading_alpha
-    )
-
-    /// Internal methods
-
-    // Bad seeded randomness
-    function bsRandom() {
-        var x = Math.sin(options.random_seed++) * 10000;
-        return x - Math.floor(x);
-    }
-  }
-
   ns.getHillshadingData = function() {
     // Cache
     if (ns._hillshadingData) {
@@ -1097,9 +479,7 @@ newRenderer = function(){
       return Math.cos(Math.PI - aspect - sunAzimuth) * Math.sin(slope) * Math.sin(Math.PI * .5 - sunElevation) + 
         Math.cos(slope) * Math.cos(Math.PI * .5 - sunElevation);
     }
-    var hmax = 0
     var lPixelMap = new Float64Array((width+1) * (height+1))
-    var hPixelMap = new Float64Array((width+1) * (height+1))
     var dxPixelMap = new Float64Array((width+1) * (height+1))
     var dyPixelMap = new Float64Array((width+1) * (height+1))
     heatmapData.hPixelMap.forEach((h,i) => {
@@ -1121,9 +501,6 @@ newRenderer = function(){
       var slope = getSlope(dx, dy, options.elevation_strength * Math.sqrt(width * height))
       var aspect = getAspect(dx, dy)
       var L = getReflectance(aspect, slope, options.hillshading_sun_azimuth, options.hillshading_sun_elevation)
-      var h = (hleft+hright+htop+hbottom)/4 || 0
-      hmax = Math.max(hmax, h)
-      hPixelMap[i] = h
       lPixelMap[i] = L
       dxPixelMap[i] = dx
       dyPixelMap[i] = dy
@@ -1131,7 +508,6 @@ newRenderer = function(){
     ns.report2("...done.")
     ns._hillshadingData = {
       lPixelMap: lPixelMap,
-      hPixelMap: hPixelMap.map(h => {return h/hmax}),
       dxPixelMap: dxPixelMap,
       dyPixelMap: dyPixelMap,
       width: width,
@@ -1139,92 +515,6 @@ newRenderer = function(){
       ratio: ratio
     }
     return ns._hillshadingData
-  }
-
-  ns.getHeatmapData = function() {
-    // Cache
-    if (ns._heatmapData) {
-      return ns._heatmapData
-    }
-
-    ns.log2("Precompute heatmap data...")
-
-    // Note: here we do not pass specific options, because
-    // the method can be called in different drawing contexts
-    var options = {}
-    options.node_size = 1
-    options.resolution_max = ns.settings.heatmap_resolution_max || 1000000 // 1 megapixel.
-    options.spread = ns.settings.heatmap_spreading || 1 // in mm
-    
-    var i, x, y, d, h, ratio, width, height
-    var g = ns.g
-    // Note we use native dimensions here (not rescaled by tiles)
-    // because for the tiles to join perfectly, this must always be
-    // computed for the whole set of nodes, i.e. on the untiled image.
-    // Performance is managed with a different system (see the ratio below).
-    var dim = {
-      w: Math.floor(ns.settings.image_width * ns.settings.rendering_dpi * 0.0393701),
-      h: Math.floor(ns.settings.image_height * ns.settings.rendering_dpi * 0.0393701)
-    }
-
-    // Ratio
-    if (dim.w*dim.h>options.resolution_max) {
-      ratio = Math.sqrt(options.resolution_max/(dim.w*dim.h))
-      width = Math.floor(ratio*dim.w)
-      height = Math.floor(ratio*dim.h)
-    } else {
-      ratio = 1
-      width = dim.w
-      height = dim.h
-    }
-    console.log("Heat map ratio:",ratio,"- Dimensions: "+width+" x "+height)
-
-    // Init a pixel map of floats for heat
-    var hPixelMap = new Float64Array((width+1) * (height+1))
-    for (i in hPixelMap) {
-      hPixelMap[i] = 0
-    }
-
-    // Compute the heat using the pixel map
-    var spread = options.spread * ratio * ns.settings.rendering_dpi * 0.0393701
-    g.nodes().forEach(nid => {
-      var n = g.getNodeAttributes(nid)
-      var nsize = ratio * n.size * options.node_size * ns.settings.tile_factor
-      var nx = ratio * n.x * ns.settings.tile_factor
-      var ny = ratio * n.y * ns.settings.tile_factor
-      for (x = 0; x <= width; x++ ){
-        for (y = 0; y <= height; y++ ){
-          i = x + (width+1) * y
-          d = Math.sqrt(Math.pow(nx - x, 2) + Math.pow(ny - y, 2))
-          h = 1 / (1+Math.pow(d/spread, 2))
-          hPixelMap[i] = hPixelMap[i] + h
-        }
-      }
-    })
-
-    // Normalize
-    hPixelMap = hPixelMap.map(h => h/g.order) // helps consistency across networks
-    var hMax = -Infinity
-    hPixelMap.forEach(h => {
-      hMax = Math.max(h, hMax)
-    })
-    // Note: we do not actually normalize
-    // for the sake of consistency.
-    // Indeed, the actual max depends on the resolution,
-    // which we do not want. So we keep the raw data
-    // as a basis and we only normalize if needed.
-    // That's why hMax is exported in the data bundle.
-    // hPixelMap = hPixelMap.map(h => h/hMax)
-
-    ns.report2("...done.")
-    ns._heatmapData = {
-      hPixelMap:hPixelMap,
-      hMax: hMax,
-      width:width,
-      height:height,
-      ratio:ratio
-    }
-    return ns._heatmapData
   }
 
   ns.drawHillshadingGradient = function(options) {
@@ -1348,6 +638,252 @@ newRenderer = function(){
     )
   }
 
+  ns.drawTextLegend = function(options) {
+    ns.log("Draw text legend...")
+
+    options = options || {}
+    options.legend_background_color = options.legend_background_color || "#FFF"
+    options.legend_font_family = options.legend_font_family || "Raleway"
+    options.legend_font_size = options.legend_font_size || 12 // in pt
+    options.legend_font_weight = options.legend_font_weight || 400
+    options.legend_font_color = options.legend_font_color || "#171637"
+    options.legend_line_height_ratio = options.legend_line_height_ratio || 1.666
+    options.legend_text = options.legend_text || "No legend text to display."
+    options.legend_margin_bottom = (options.legend_margin_bottom === undefined)?(6):(options.legend_margin_bottom) // in mm, space for the text etc.
+    options.legend_margin_right  = (options.legend_margin_right  === undefined)?(6):(options.legend_margin_right ) // in mm, space for the text etc.
+    options.legend_margin_left   = (options.legend_margin_left   === undefined)?(6):(options.legend_margin_left  ) // in mm, space for the text etc.
+    options.legend_margin_top    = (options.legend_margin_top    === undefined)?(6):(options.legend_margin_top   ) // in mm, space for the text etc.
+
+    var dim = ns.getRenderingPixelDimensions()
+    var ctx = ns.createCanvas().getContext("2d")
+    ns.scaleContext(ctx)
+    
+    var margin_bottom = ns.mm_to_px(options.legend_margin_bottom)
+    var margin_right  = ns.mm_to_px(options.legend_margin_right)
+    var margin_left   = ns.mm_to_px(options.legend_margin_left)
+    var margin_top    = ns.mm_to_px(options.legend_margin_top)
+
+    var lineHeight = ns.pt_to_px(options.legend_line_height_ratio * options.legend_font_size)
+
+    ns.paintAll(ctx, options.legend_background_color)
+
+    // Text style
+    ctx.lineWidth = 0;
+    ctx.fillStyle = options.legend_font_color
+    ctx.font = ns.buildContextFontString(options.legend_font_weight, ns.pt_to_pt(options.legend_font_size), options.legend_font_family)
+    
+    // Text block
+    var y = wrapText(ctx, options.legend_text, margin_left, margin_top + .3 * lineHeight, dim.w - margin_left - margin_right, lineHeight)
+
+    ns.log("...done.")
+    return ctx.getImageData(0, 0, ctx.canvas.width, y + margin_bottom)
+
+    // Internal methods
+    function wrapText(context, text, x, y, maxWidth, lineHeight) {
+      var words = text.split(' ');
+      var line = '';
+
+      for(var n = 0; n < words.length; n++) {
+        var testLine = line + words[n] + ' ';
+        var metrics = context.measureText(testLine);
+        var testWidth = metrics.width;
+        if (testWidth > maxWidth && n > 0) {
+          context.fillText(line, x, y);
+          line = words[n] + ' ';
+          y += lineHeight;
+        }
+        else {
+          line = testLine;
+        }
+      }
+      context.fillText(line, x, y);
+      return y
+    }
+  }
+
+  ns.getPoissonDiscSampling = function() {
+    // Cache
+    if (ns._poissonDiscSampling) {
+      return ns._poissonDiscSampling
+    }
+
+    ns.log2("Precompute poisson disc sample...")
+
+    // For consistency, we sample on the whole space
+    var dim = {
+      w: Math.floor(ns.settings.image_width * ns.settings.rendering_dpi * 0.0393701),
+      h: Math.floor(ns.settings.image_height * ns.settings.rendering_dpi * 0.0393701)
+    }
+
+    var radius = ns.settings.poisson_disc_radius || 5 // in mm
+    var r = radius * ns.settings.rendering_dpi * 0.0393701
+
+    var sampler = poissonDiscSampler(dim.w, dim.h, r)
+    var points = []
+    var s
+    while (s = sampler()) {points.push(s)}
+    ns._poissonDiscSampling = points
+    ns.report2("...done.")
+    return points
+
+    // Internal methods, from https://gist.github.com/mbostock/19168c663618b7f07158
+    function poissonDiscSampler(width, height, radius) {
+      var k = 30, // maximum number of samples before rejection
+          radius2 = radius * radius,
+          R = 3 * radius2,
+          cellSize = radius * Math.SQRT1_2,
+          gridWidth = Math.ceil(width / cellSize),
+          gridHeight = Math.ceil(height / cellSize),
+          grid = new Array(gridWidth * gridHeight),
+          queue = [],
+          queueSize = 0,
+          sampleSize = 0;
+
+      return function() {
+        if (!sampleSize) return sample(Math.random() * width, Math.random() * height);
+
+        // Pick a random existing sample and remove it from the queue.
+        while (queueSize) {
+          var i = Math.random() * queueSize | 0,
+              s = queue[i];
+
+          // Make a new candidate between [radius, 2 * radius] from the existing sample.
+          for (var j = 0; j < k; ++j) {
+            var a = 2 * Math.PI * Math.random(),
+                r = Math.sqrt(Math.random() * R + radius2),
+                x = s[0] + r * Math.cos(a),
+                y = s[1] + r * Math.sin(a);
+
+            // Reject candidates that are outside the allowed extent,
+            // or closer than 2 * radius to any existing sample.
+            if (0 <= x && x < width && 0 <= y && y < height && far(x, y)) return sample(x, y);
+          }
+
+          queue[i] = queue[--queueSize];
+          queue.length = queueSize;
+        }
+      };
+
+      function far(x, y) {
+        var i = x / cellSize | 0,
+            j = y / cellSize | 0,
+            i0 = Math.max(i - 2, 0),
+            j0 = Math.max(j - 2, 0),
+            i1 = Math.min(i + 3, gridWidth),
+            j1 = Math.min(j + 3, gridHeight);
+
+        for (j = j0; j < j1; ++j) {
+          var o = j * gridWidth;
+          for (i = i0; i < i1; ++i) {
+            if (s = grid[o + i]) {
+              var s,
+                  dx = s[0] - x,
+                  dy = s[1] - y;
+              if (dx * dx + dy * dy < radius2) return false;
+            }
+          }
+        }
+
+        return true;
+      }
+
+      function sample(x, y) {
+        var s = [x, y];
+        queue.push(s);
+        grid[gridWidth * (y / cellSize | 0) + (x / cellSize | 0)] = s;
+        ++sampleSize;
+        ++queueSize;
+        return s;
+      }
+    }
+  }
+
+  ns.getHeatmapData = function() {
+    // Cache
+    if (ns._heatmapData) {
+      return ns._heatmapData
+    }
+
+    ns.log2("Precompute heatmap data...")
+
+    // Note: here we do not pass specific options, because
+    // the method can be called in different drawing contexts
+    var options = {}
+    options.node_size = 1
+    options.resolution_max = ns.settings.heatmap_resolution_max || 1000000 // 1 megapixel.
+    options.spread = ns.settings.heatmap_spreading || 1 // in mm
+    
+    var i, x, y, d, h, ratio, width, height
+    var g = ns.g
+    // Note we use native dimensions here (not rescaled by tiles)
+    // because for the tiles to join perfectly, this must always be
+    // computed for the whole set of nodes, i.e. on the untiled image.
+    // Performance is managed with a different system (see the ratio below).
+    var dim = {
+      w: Math.floor(ns.settings.image_width * ns.settings.rendering_dpi * 0.0393701),
+      h: Math.floor(ns.settings.image_height * ns.settings.rendering_dpi * 0.0393701)
+    }
+
+    // Ratio
+    if (dim.w*dim.h>options.resolution_max) {
+      ratio = Math.sqrt(options.resolution_max/(dim.w*dim.h))
+      width = Math.floor(ratio*dim.w)
+      height = Math.floor(ratio*dim.h)
+    } else {
+      ratio = 1
+      width = dim.w
+      height = dim.h
+    }
+    console.log("Heat map ratio:",ratio,"- Dimensions: "+width+" x "+height)
+
+    // Init a pixel map of floats for heat
+    var hPixelMap = new Float64Array((width+1) * (height+1))
+    for (i in hPixelMap) {
+      hPixelMap[i] = 0
+    }
+
+    // Compute the heat using the pixel map
+    var spread = options.spread * ratio * ns.settings.rendering_dpi * 0.0393701
+    g.nodes().forEach(nid => {
+      var n = g.getNodeAttributes(nid)
+      var nsize = ratio * n.size * options.node_size * ns.settings.tile_factor
+      var nx = ratio * n.x * ns.settings.tile_factor
+      var ny = ratio * n.y * ns.settings.tile_factor
+      for (x = 0; x <= width; x++ ){
+        for (y = 0; y <= height; y++ ){
+          i = x + (width+1) * y
+          d = Math.sqrt(Math.pow(nx - x, 2) + Math.pow(ny - y, 2))
+          h = 1 / (1+Math.pow(d/spread, 2))
+          hPixelMap[i] = hPixelMap[i] + h
+        }
+      }
+    })
+
+    // Normalize
+    hPixelMap = hPixelMap.map(h => h/g.order) // helps consistency across networks
+    var hMax = -Infinity
+    hPixelMap.forEach(h => {
+      hMax = Math.max(h, hMax)
+    })
+    // Note: we do not actually normalize
+    // for the sake of consistency.
+    // Indeed, the actual max depends on the resolution,
+    // which we do not want. So we keep the raw data
+    // as a basis and we only normalize if needed.
+    // That's why hMax is exported in the data bundle.
+    // hPixelMap = hPixelMap.map(h => h/hMax)
+
+    ns.report2("...done.")
+    ns._heatmapData = {
+      hPixelMap:hPixelMap,
+      hMax: hMax,
+      width:width,
+      height:height,
+      ratio:ratio
+    }
+    return ns._heatmapData
+  }
+
   ns.drawConnectedClosenessLegend = function(options) {
     ns.log("Draw connected-closeness legend...")
 
@@ -1380,10 +916,10 @@ newRenderer = function(){
     var textThickness = ns.mm_to_px(options.cc_text_border_thickness);
     var lineThickness = ns.mm_to_px(options.cc_line_thickness);
     
-    var margin_bottom = ns.mm_to_px(options.margin_bottom + options.cc_info_margin_offset)
+    var margin_bottom = ns.mm_to_px(options.margin_bottom - options.cc_info_margin_offset)
     var margin_right  = ns.mm_to_px(options.margin_right + options.cc_info_margin_offset)
     var margin_left   = ns.mm_to_px(options.margin_left - options.cc_info_margin_offset)
-    var margin_top    = ns.mm_to_px(options.margin_top - options.cc_info_margin_offset)
+    var margin_top    = ns.mm_to_px(options.margin_top + options.cc_info_margin_offset)
     var centerPoint = {x: margin_left + (dim.w-margin_left-margin_right)/2, y:margin_top + (dim.h-margin_top-margin_bottom)/2}
     var southWestPoint = {x: margin_left, y:dim.h-margin_bottom}
     var westPoint = {x: southWestPoint.x, y: centerPoint.y}
@@ -1629,10 +1165,10 @@ newRenderer = function(){
     var ctx = ns.createCanvas().getContext("2d")
     ns.scaleContext(ctx)
     
-    var margin_bottom = ns.mm_to_px(options.margin_bottom + options.cc_info_margin_offset)
+    var margin_bottom = ns.mm_to_px(options.margin_bottom - options.cc_info_margin_offset)
     var margin_right  = ns.mm_to_px(options.margin_right + options.cc_info_margin_offset)
     var margin_left   = ns.mm_to_px(options.margin_left - options.cc_info_margin_offset)
-    var margin_top    = ns.mm_to_px(options.margin_top - options.cc_info_margin_offset)
+    var margin_top    = ns.mm_to_px(options.margin_top + options.cc_info_margin_offset)
     var centerPoint = {x: margin_left + (dim.w-margin_left-margin_right)/2, y:margin_top + (dim.h-margin_top-margin_bottom)/2}
 
     if (C_max >= options.C_max_threshold) {
@@ -1729,7 +1265,7 @@ newRenderer = function(){
 
     var options = {}
     options.resolution_max = 100000000 // 10 megapixel
-    options.node_size_margin = 10 // In mm 
+    options.node_size_margin = ns.settings.cluster_node_size_margin || 10 // In mm 
     options.node_size_factor = ns.settings.cluster_shape_size * ns.settings.node_size || 3 // above 0, default 1
     options.blur_radius = ns.settings.cluster_shape_smoothness || 5 // In mm
     options.gradient_threshold = 1-ns.settings.cluster_shape_swelling || 0.4
@@ -1860,13 +1396,12 @@ newRenderer = function(){
     options = options || {}
     options.cluster_fill_color_by_modality = options.cluster_fill_color_by_modality || false
     options.cluster_fill_color_default = ns.settings.node_clusters.default_color || options.cluster_fill_color_default || "#8BD"
-    options.cluster_fill_alpha = options.cluster_fill_alpha || 0.3
     
     var g = ns.g
     var dim = ns.getRenderingPixelDimensions()
     var ctx = ns.createCanvas().getContext("2d")
     ctx.putImageData(backgroundImg, 0, 0)
-    ctx.globalCompositeOperation = "hard-light"
+    ctx.globalCompositeOperation = "source-atop"
 
     var modalities = ns.getModalities()
     modalities.forEach(modality => {
@@ -1885,7 +1420,6 @@ newRenderer = function(){
     options = options || {}
     options.cluster_fill_color_by_modality = options.cluster_fill_color_by_modality || false
     options.cluster_fill_color_default = ns.settings.node_clusters.default_color || options.cluster_fill_color_default || "#8BD"
-    options.cluster_fill_alpha = options.cluster_fill_alpha || 0.3
     
     var g = ns.g
     var dim = ns.getRenderingPixelDimensions()
@@ -2248,9 +1782,8 @@ newRenderer = function(){
     labelsStack.forEach(function(l){
       ctx.font = l.font
       ctx.lineWidth = borderThickness
-      ctx.fillStyle = l.color
-      ctx.strokeStyle = l.color
-
+      ctx.fillStyle = l.color.toString()
+      ctx.strokeStyle = l.color.toString()
       ctx.fillText(
         l.label
       , l.x
@@ -2285,7 +1818,7 @@ newRenderer = function(){
     options = options || {}
     options.label_count = options.label_count || Infinity // Only (try to) display a number of labels
     options.label_max_length = options.label_max_length || Infinity // Max characters (else an ellipsis is used)
-    options.colored_labels = (options.colored_labels===undefined)?(true):(options.colored_labels)
+    options.label_color_from_nodes = (options.label_color_from_nodes===undefined)?(true):(options.label_color_from_nodes)
     options.label_color = options.label_color || "#000"
     options.sized_labels = (options.sized_labels===undefined)?(true):(options.sized_labels)
     options.node_size = options.node_size || 1 // A scaling factor
@@ -2353,19 +1886,19 @@ newRenderer = function(){
       var nx = n.x
       var ny = n.y
 
-      var ncol
-      /*
-      var modality = settings.node_clusters.modalities[n[settings.node_clusters.attribute_id]]
-      if (modality) {
-        ncol = d3.color(modality.color)
-      } else {
-        ncol = d3.color(settings.node_clusters.default_color || "#8B8B8B")
+      var ncol = options.node_color_original ? (n.color || options.node_fill_color) : options.node_fill_color
+      if (options.node_color_from_clusters) {
+        let m = options.node_clusters.modalities[n[options.node_clusters.attribute_id]]
+        if (m) {
+          ncol = m.color
+        } else {
+          ncol = options.node_clusters.default_color
+        }
       }
-      */
+      ncol = d3.color(ncol)
 
       // Precompute the label
-      // var color = options.colored_labels ? tuneColorForLabel(ncol) : d3.color('#666')
-      var color = d3.color(options.label_color)
+      var color = options.label_color_from_nodes ? ns.tuneColorForLabel(ncol) : d3.color(options.label_color)
       var fontSize = ns.pt_to_pt( options.sized_labels
         ? Math.floor(options.label_font_min_size + (n.size - label_nodeSizeExtent[0]) * (options.label_font_max_size - options.label_font_min_size) / (label_nodeSizeExtent[1] - label_nodeSizeExtent[0]))
         : Math.floor(0.8 * options.label_font_min_size + 0.2 * options.label_font_max_size)
@@ -2436,6 +1969,17 @@ newRenderer = function(){
 
     ns.report("...done.")
     return ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
+  }
+
+  ns.tuneColorForLabel = function(col) {
+    var lightnessRatio = .8 // Darker no matter what
+    var lightnessMax = 60 // Ensure it's dark enough regardless
+    var hcl = d3.hcl(col)
+    hcl.l *= lightnessRatio
+    if (hcl.l > lightnessMax) {
+      hcl.l = lightnessMax
+    }
+    return d3.color(hcl)
   }
 
   ns.getVisibleLabels = function(options, normalizeFontSize) {
@@ -2646,11 +2190,15 @@ newRenderer = function(){
      
     var options = options || {}
     options.max_edge_count = (options.max_edge_count === undefined)?(Infinity):(options.max_edge_count) // for monitoring only
-    options.pen_size = options.pen_size || .2 // in mm
+    options.edge_thickness = options.edge_thickness || 0.05 // in mm
+    options.edge_weight_as_thickness = (options.edge_weight_as_thickness===undefined)?(false):(options.edge_weight_as_thickness)
     options.edge_alpha = (options.edge_alpha===undefined)?(1):(options.edge_alpha) // from 0 to 1
     options.edge_color = options.edge_color || "#303040"
+    options.edge_color_from_nodes = (options.edge_color_from_nodes===undefined)?(false):(options.edge_color_from_nodes)
+    options.edge_curved = (options.edge_curved===undefined)?(true):(options.edge_curved)
+    options.edge_curvature_deviation_angle = options.edge_curvature_deviation_angle || Math.PI / 10 // in radians
     options.edge_high_quality = options.edge_high_quality || false
-    options.edge_path_jitter = (options.edge_path_jitter === undefined)?(0.01):(options.edge_path_jitter) // in mm
+    options.edge_path_jitter = (options.edge_path_jitter === undefined)?(0.00):(options.edge_path_jitter) // in mm
     options.edge_path_segment_length = options.edge_high_quality?.2:2 // in mm
     // Monitoring options
     options.display_voronoi = false // for monitoring purpose
@@ -2752,9 +2300,22 @@ newRenderer = function(){
       ns.report2("...done.")
     }
 
+
+    // Scale thickness to weight
+    var thickness = ns.mm_to_px(options.edge_thickness)
+    var thicknessRatio = 1
+    if (options.edge_weight_as_thickness) {
+      var averageWeight = 0
+      g.edges().forEach(eid => {
+        let w = Math.max(0, g.getEdgeAttribute(eid, "weight") || 1)
+        averageWeight += w
+      })
+      averageWeight /= g.size
+      thicknessRatio = thickness / averageWeight
+    }
+
     // Draw each edge
     var color = d3.color(options.edge_color)
-    var thickness = ns.mm_to_px(options.pen_size)
     var jitter = ns.mm_to_px(options.edge_path_jitter)
     var tf = ns.settings.tile_factor
     if (options.display_edges) {
@@ -2764,6 +2325,13 @@ newRenderer = function(){
       g.edges()
         .filter(function(eid, i_){ return i_ < options.max_edge_count })
         .forEach(function(eid, i_){
+          // Edge weight
+          if (options.edge_weight_as_thickness) {
+            edgeThickness = (Math.max(0, g.getEdgeAttribute(eid, "weight") || 1)) * thicknessRatio
+          } else {
+            edgeThickness = thickness
+          }
+
           if ((i_+1)%10000 == 0) {
             console.log("..."+(i_+1)/1000+"K edges drawn...")
           }
@@ -2771,27 +2339,59 @@ newRenderer = function(){
           var n_t = g.getNodeAttributes(g.target(eid))
           var path, i, x, y, o, dpixi, lastdpixi, lasto, pixi, pi
 
+          // Color
+          if (options.edge_color_from_nodes) {
+            var colors = [options.node_fill_color, options.node_fill_color]
+            if (options.node_color_original) {
+              colors = [n_s.color, n_t.color]
+            }
+            if (options.node_color_from_clusters) {
+              colors = [n_s, n_t].map(n => {
+                let m = options.node_clusters.modalities[n[options.node_clusters.attribute_id]]
+                if (m) {
+                  return m.color
+                } else {
+                  return options.node_clusters.default_color
+                }
+              })
+            }
+            color = d3.color(d3.interpolateRgb.gamma(2.2)(colors[0], colors[1])(0.5))
+          }
+
           // Build path
           var d = Math.sqrt(Math.pow(n_s.x - n_t.x, 2) + Math.pow(n_s.y - n_t.y, 2))
+          var angle = Math.atan2( n_t.y - n_s.y, n_t.x - n_s.x )
           var iPixStep = ns.mm_to_px(options.edge_path_segment_length)
           var segCount = Math.ceil(d/iPixStep)
           pi = 0
           path = new Int32Array(3*segCount)
-          for (i=0; i<1; i+=iPixStep/d) {
-            x = (1-i)*n_s.x + i*n_t.x
-            y = (1-i)*n_s.y + i*n_t.y
+          if (options.edge_curved && g.isDirected(eid)) {
+            let H = d / (2 * Math.tan(options.edge_curvature_deviation_angle))
+            let offset
+            for (i=0; i<1; i+=iPixStep/d) {
+              offset = H * (Math.sqrt(1 - ( (1-i) * i * Math.pow(d/H,2) )) - 1)
+              x = (1-i)*n_s.x + i*n_t.x - offset * Math.sin(angle)
+              y = (1-i)*n_s.y + i*n_t.y + offset * Math.cos(angle)
 
-            path[pi  ] = x*tf
-            path[pi+1] = y*tf
-            path[pi+2] = 255
-            pi +=3
+              path[pi  ] = x*tf
+              path[pi+1] = y*tf
+              path[pi+2] = 255
+              pi +=3
+            }
+          } else {
+            for (i=0; i<1; i+=iPixStep/d) {
+              x = (1-i)*n_s.x + i*n_t.x
+              y = (1-i)*n_s.y + i*n_t.y
+
+              path[pi  ] = x*tf
+              path[pi+1] = y*tf
+              path[pi+2] = 255
+              pi +=3
+            }
           }
           path[3*(segCount-1)  ] = n_t.x*tf
           path[3*(segCount-1)+1] = n_t.y*tf
           path[3*(segCount-1)+2] = 255
-
-          // Modify path
-
 
           // Compute path opacity
           if (options.edge_high_quality) {
@@ -2839,352 +2439,8 @@ newRenderer = function(){
             y = Math.floor( 1000 * (path[i+1]/tf + jitter * (0.5 - Math.random())) ) / 1000
             o = path[i+2]/255
 
-            // Collapse opacity
-            o = (Math.random()<=o) ? (1) : (0)
-
             if (lastx) {
-              ctx.lineWidth = thickness * (0.9 + 0.2*Math.random())
-              color.opacity = (lasto+o)/2
-              ctx.beginPath()
-              ctx.strokeStyle = color.toString()
-              ctx.moveTo(lastx, lasty)
-              ctx.lineTo(x, y)
-              ctx.stroke()
-              ctx.closePath()
-            }
-
-            lastx = x
-            lasty = y
-            lasto = o
-          }
-        })
-    }
-
-    ns.report("...done.")
-    return ns.multiplyAlpha(
-      ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height),
-      options.edge_alpha
-    )
-  }
-
-  ns.drawEdgesExperimentLayer = function(options) {
-    ns.log("Draw edges EXPERIMENTAL...")
-     
-    var options = options || {}
-    options.max_edge_count = (options.max_edge_count === undefined)?(Infinity):(options.max_edge_count) // for monitoring only
-    options.pen_size = options.pen_size || .2 // in mm
-    options.edge_alpha = (options.edge_alpha===undefined)?(1):(options.edge_alpha) // from 0 to 1
-    options.edge_color = options.edge_color || "#303040"
-    options.edge_high_quality = true//options.edge_high_quality || false
-    options.edge_path_jitter = 0//(options.edge_path_jitter === undefined)?(0.01):(options.edge_path_jitter) // in mm
-    options.edge_path_segment_length = options.edge_high_quality?.2:2 // in mm
-    // Monitoring options
-    options.display_voronoi = false // for monitoring purpose
-    options.display_edges = true // disable for monitoring purpose
-
-    var g = ns.g
-    var dim = ns.getRenderingPixelDimensions()
-    var ctx = ns.createCanvas().getContext("2d")
-    ns.scaleContext(ctx)
-
-    var gradient = function(d){
-      return Math.round(10000*
-        (0.5 + 0.5 * Math.cos(Math.PI - Math.pow(d, 2) * Math.PI))
-      )/10000
-    }
-
-    var dPixelMap_u, vidPixelMap_u // unpacked versions
-    if (options.display_voronoi || options.edge_high_quality) {
-      var voronoiData = ns.getVoronoiData()
-      
-      // Unpack voronoi
-      ns.log2("Rescale Voronoï to actual draw space...")
-      var ratio = 1/voronoiData.ratio
-      if (g.order < 255) {
-        vidPixelMap_u = new Uint8Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
-      } else if (g.order < 65535) {
-        vidPixelMap_u = new Uint16Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
-      } else {
-        vidPixelMap_u = new Uint32Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
-      }
-      dPixelMap_u = new Uint8Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
-      var xu, yu, xp, xp1, xp2, dx, yp, yp1, yp2, dy, ip_top_left, ip_top_right, ip_bottom_left, ip_bottom_right
-      for (var i=0; i<vidPixelMap_u.length; i++) {
-        // unpacked coordinates
-        xu = i%(dim.w * ns.settings.tile_factor)
-        yu = (i-xu)/(dim.w * ns.settings.tile_factor)
-        // packed coordinates
-        xp = xu/ratio
-        xp1 = Math.max(0, Math.min(voronoiData.width, Math.floor(xp)))
-        xp2 = Math.max(0, Math.min(voronoiData.width, Math.ceil(xp)))
-        dx = (xp-xp1)/(xp2-xp1) || 0
-        yp = yu/ratio
-        yp1 = Math.max(0, Math.min(voronoiData.height, Math.floor(yp)))
-        yp2 = Math.max(0, Math.min(voronoiData.height, Math.ceil(yp)))
-        dy = (yp-yp1)/(yp2-yp1) || 0
-        // coordinates of the 4 pixels necessary to rescale
-        ip_top_left = xp1 + (voronoiData.width+1) * yp1
-        ip_top_right = xp2 + (voronoiData.width+1) * yp1
-        ip_bottom_left = xp1 + (voronoiData.width+1) * yp2
-        ip_bottom_right = xp2 + (voronoiData.width+1) * yp2
-        // Rescaling (gradual blending between the 4 pixels)
-        dPixelMap_u[i] =
-            (1-dx) * (
-              (1-dy) * voronoiData.dPixelMap[ip_top_left]
-              +  dy  * voronoiData.dPixelMap[ip_bottom_left]
-            )
-          + dx * (
-              (1-dy) * voronoiData.dPixelMap[ip_top_right]
-              +  dy  * voronoiData.dPixelMap[ip_bottom_right]
-            )
-        // For vid we use only one (it's not a number but an id)
-        if (dx<0.5) {
-          if (dy<0.5) {
-            vidPixelMap_u[i] = voronoiData.vidPixelMap[ip_top_left]
-          } else {
-            vidPixelMap_u[i] = voronoiData.vidPixelMap[ip_bottom_left]
-          }
-        } else {
-          if (dy<0.5) {
-            vidPixelMap_u[i] = voronoiData.vidPixelMap[ip_top_right]
-          } else {
-            vidPixelMap_u[i] = voronoiData.vidPixelMap[ip_bottom_right]
-          }
-        }
-      }
-      ns.report2("...done.")
-    }
-
-    if (options.display_voronoi) {
-      ns.log2("Draw Voronoï (for monitoring)...")
-      let vData = new Uint8ClampedArray(dim.w * dim.h * 4)
-      let xOffset = -dim.w*ns.settings.tile_to_render[0]
-      let yOffset = -dim.h*ns.settings.tile_to_render[1]
-      dPixelMap_u.forEach((d,i) => {
-        let x = i%(dim.w*ns.settings.tile_factor)
-        let y = (i-x)/(dim.w*ns.settings.tile_factor)
-        let X = x + xOffset
-        let Y = y + yOffset
-        if (0 <= X && X <= dim.w && 0 <= Y && Y <= dim.h) {
-          let I = X + Y*dim.w
-          vData[4*I  ] = 0
-          vData[4*I+1] = 0
-          vData[4*I+2] = 0
-          vData[4*I+3] = Math.floor(255*gradient(d/255))
-        }
-      })
-      let vImgd = new ImageData(vData, dim.w, dim.h)
-      ctx.putImageData(vImgd,0, 0)
-      ns.report2("...done.")
-    }
-
-    // Hillshading data
-    var shadingData = ns.getHillshadingData()
-
-    // Unpack hillshading
-    var ratio = 1/shadingData.ratio
-    var lPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
-    var dxPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
-    var dyPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
-    var xu, yu, xp, xp1, xp2, dx, yp, yp1, yp2, dy, ip_top_left, ip_top_right, ip_bottom_left, ip_bottom_right
-    for (var i=0; i<lPixelMap.length; i++) {
-      // unpacked coordinates
-      xu = i%(dim.w * ns.settings.tile_factor)
-      yu = (i-xu)/(dim.w * ns.settings.tile_factor)
-      // packed coordinates
-      xp = xu/ratio
-      xp1 = Math.max(0, Math.min(shadingData.width, Math.floor(xp)))
-      xp2 = Math.max(0, Math.min(shadingData.width, Math.ceil(xp)))
-      dx = (xp-xp1)/(xp2-xp1) || 0
-      yp = yu/ratio
-      yp1 = Math.max(0, Math.min(shadingData.height, Math.floor(yp)))
-      yp2 = Math.max(0, Math.min(shadingData.height, Math.ceil(yp)))
-      dy = (yp-yp1)/(yp2-yp1) || 0
-      // coordinates of the 4 pixels necessary to rescale
-      ip_top_left = xp1 + (shadingData.width+1) * yp1
-      ip_top_right = xp2 + (shadingData.width+1) * yp1
-      ip_bottom_left = xp1 + (shadingData.width+1) * yp2
-      ip_bottom_right = xp2 + (shadingData.width+1) * yp2
-      // Rescaling (gradual blending between the 4 pixels)
-      lPixelMap[i] =
-          (1-dx) * (
-            (1-dy) * shadingData.lPixelMap[ip_top_left]
-            +  dy  * shadingData.lPixelMap[ip_bottom_left]
-          )
-        + dx * (
-            (1-dy) * shadingData.lPixelMap[ip_top_right]
-            +  dy  * shadingData.lPixelMap[ip_bottom_right]
-          )
-      dxPixelMap[i] =
-          (1-dx) * (
-            (1-dy) * shadingData.dxPixelMap[ip_top_left]
-            +  dy  * shadingData.dxPixelMap[ip_bottom_left]
-          )
-        + dx * (
-            (1-dy) * shadingData.dxPixelMap[ip_top_right]
-            +  dy  * shadingData.dxPixelMap[ip_bottom_right]
-          )
-      dyPixelMap[i] =
-          (1-dx) * (
-            (1-dy) * shadingData.dyPixelMap[ip_top_left]
-            +  dy  * shadingData.dyPixelMap[ip_bottom_left]
-          )
-        + dx * (
-            (1-dy) * shadingData.dyPixelMap[ip_top_right]
-            +  dy  * shadingData.dyPixelMap[ip_bottom_right]
-          )
-    }
-
-    // Draw each edge
-    var color = d3.color(options.edge_color)
-    var thickness = ns.mm_to_px(options.pen_size)
-    var jitter = ns.mm_to_px(options.edge_path_jitter)
-    var tf = ns.settings.tile_factor
-    if (options.display_edges) {
-      ctx.lineCap="round"
-      ctx.lineJoin="round"
-      ctx.fillStyle = 'rgba(0, 0, 0, 0)';
-      g.edges()
-        //.filter(function(eid, i_){ return i_ == 181 })
-        .filter(function(eid, i_){ return i_ < options.max_edge_count })
-        .forEach(function(eid, i_){
-          if ((i_+1)%10000 == 0) {
-            console.log("..."+(i_+1)/1000+"K edges drawn...")
-          }
-          var n_s = g.getNodeAttributes(g.source(eid))
-          var n_t = g.getNodeAttributes(g.target(eid))
-          var path, i, x, y, o, dpixi, lastdpixi, lasto, pixi, pi
-
-          // Build path
-          var d = Math.sqrt(Math.pow(n_s.x - n_t.x, 2) + Math.pow(n_s.y - n_t.y, 2))
-          var iPixStep = ns.mm_to_px(options.edge_path_segment_length)
-          var segCount = Math.ceil(d/iPixStep)
-          pi = 0
-          path = new Float32Array(3*segCount)
-          for (i=0; i<1; i+=iPixStep/d) {
-            x = (1-i)*n_s.x + i*n_t.x
-            y = (1-i)*n_s.y + i*n_t.y
-            path[pi  ] = x*tf
-            path[pi+1] = y*tf
-            path[pi+2] = 255
-            pi +=3
-          }
-          path[3*(segCount-1)  ] = n_t.x*tf
-          path[3*(segCount-1)+1] = n_t.y*tf
-          path[3*(segCount-1)+2] = 255
-
-          // Modify path
-          var str = 200
-          var hooke = .01
-          var dMax = 20
-          var loops = 100
-          while (loops-->0) {
-            var dpath = new Float32Array(3*segCount)
-            if (path.length > 3 * 5) {
-              var lastx = path[0] / tf
-              var lasty = path[1] / tf
-              x = path[3] / tf
-              y = path[4] / tf
-              var nextx = path[6] / tf
-              var nexty = path[7] / tf
-              for (pi=3; pi<path.length-3; pi+=3) {
-                let i = Math.floor(Math.floor(x) + Math.floor(y)*dim.w*tf)
-                let heatmap_dx = str*dxPixelMap[i]
-                let heatmap_dy = str*dyPixelMap[i]
-                let dlast = -hooke * Math.sqrt(Math.pow(x-lastx,2)+Math.pow(y-lasty,2))
-                let last_dx = dlast * (x-lastx)
-                let last_dy = dlast * (y-lasty)
-                let dnext = -hooke * Math.sqrt(Math.pow(x-nextx,2)+Math.pow(y-nexty,2))
-                let next_dx = dnext * (x-nextx)
-                let next_dy = dnext * (y-nexty)
-                let dx = heatmap_dx + last_dx + next_dx
-                let dy = heatmap_dy + last_dy + next_dy
-                let dd = Math.sqrt(dx*dx+dy*dy)
-                let dratio = Math.min(1, dMax/dd)
-                dpath[pi  ] = dratio * dx
-                dpath[pi+1] = dratio * dy
-
-                /*ctx.lineWidth = 2
-                ctx.strokeStyle = "rgba(0,0,255,0.3)"
-                ctx.beginPath()
-                ctx.moveTo(x, y)
-                ctx.lineTo(x+dpath[pi  ], y+dpath[pi+1])
-                ctx.stroke()*/
-
-                lastx = x
-                lasty = y
-                x = nextx
-                y = nexty
-                nextx = path[pi+6] / tf
-                nexty = path[pi+7] / tf
-
-              }
-              for (pi=3; pi<path.length-3; pi+=3) {
-                x = path[pi  ] / tf + dpath[pi  ]
-                y = path[pi+1] / tf + dpath[pi+1]
-                path[pi  ] = tf * x
-                path[pi+1] = tf * y
-                /*
-                ctx.beginPath()
-                ctx.arc(x, y, 2, 0, 2 * Math.PI);
-                ctx.fillStyle = "#F00"
-                ctx.fill();
-                */
-              }
-            }
-          }
-
-          // Compute path opacity
-          if (options.edge_high_quality) {
-            lastdpixi = undefined
-            for (pi=0; pi<path.length; pi+=3) {
-              x = path[pi  ] / tf
-              y = path[pi+1] / tf
-
-              // Opacity
-              pixi = Math.floor(x*tf) + dim.w * tf * Math.floor(y*tf)
-              dpixi = dPixelMap_u[pixi]
-              if (dpixi === undefined) {
-                if (lastdpixi !== undefined) {
-                  o = lasto
-                } else {
-                  o = 0
-                }
-              } else {
-                if (vidPixelMap_u[pixi] == n_s.vid || vidPixelMap_u[pixi] == n_t.vid) {
-                  o = 1
-                } else {
-                  o = gradient(dpixi/255)
-                }
-                if (lastdpixi === undefined && pi>3) {
-                  path[(pi-3)+2] = Math.round(o*255)
-                }
-              }
-              path[pi+2] = Math.round(o*255)
-              lastdpixi = dpixi
-              lasto = o
-            }
-
-            // Smoothe path opacity
-            if (path.length > 5) {
-              for (i=2; i<path.length/3-2; i++) {
-                path[i*3+2] = 0.15 * path[(i-2)*3+2] + 0.25 * path[(i-1)*3+2] + 0.2 * path[i*3+2] + 0.25 * path[(i+1)*3+2] + 0.15 * path[(i+2)*3+2]
-              }
-            }
-          }
-          
-          // Draw path
-          var x, y, o, lastx = undefined, lasty = undefined, lasto
-          for (i=0; i<path.length; i+=3) {
-            x = Math.floor( 1000 * (path[i]/tf + jitter * (0.5 - Math.random())) ) / 1000
-            y = Math.floor( 1000 * (path[i+1]/tf + jitter * (0.5 - Math.random())) ) / 1000
-            o = path[i+2]/255
-
-            // Collapse opacity
-            o = (Math.random()<=o) ? (1) : (0)
-
-            if (lastx) {
-              ctx.lineWidth = thickness * (0.9 + 0.2*Math.random())
+              ctx.lineWidth = edgeThickness * (0.9 + 0.2*Math.random())
               color.opacity = (lasto+o)/2
               ctx.beginPath()
               ctx.strokeStyle = color.toString()
@@ -3367,7 +2623,9 @@ newRenderer = function(){
     options = options || {}
     options.node_size = options.node_size || 1
     options.node_stroke = (options.node_stroke===undefined)?(true):(options.node_stroke)
-    options.pen_size = options.pen_size || .2 // in mm
+    options.node_stroke_width = options.node_stroke_width || 0.08 // in mm
+    options.node_color_original = (options.node_color_original===undefined)?(false):(options.node_color_original)
+    options.node_color_from_clusters = (options.node_color_from_clusters===undefined)?(false):(options.node_color_from_clusters)
     options.node_fill_color = options.node_fill_color || "#FFF"
     options.node_stroke_color = options.node_stroke_color || "#303040"
     
@@ -3375,13 +2633,22 @@ newRenderer = function(){
     var ctx = ns.createCanvas().getContext("2d")
     ns.scaleContext(ctx)
 
-    var stroke_width = ns.mm_to_px(options.pen_size)
+    var stroke_width = ns.mm_to_px(options.node_stroke_width)
 
     ns.getNodesBySize().forEach(function(nid){
       var n = g.getNodeAttributes(nid)
 
-      var color = options.node_fill_color
+      var color = options.node_color_original ? (n.color || options.node_fill_color) : options.node_fill_color
       var radius = Math.max(options.node_size * n.size, stroke_width)
+
+      if (options.node_color_from_clusters) {
+        let m = options.node_clusters.modalities[n[options.node_clusters.attribute_id]]
+        if (m) {
+          color = m.color
+        } else {
+          color = options.node_clusters.default_color
+        }
+      }
 
       ctx.lineCap="round"
       ctx.lineJoin="round"
@@ -3575,12 +2842,12 @@ newRenderer = function(){
     options.flip_x = options.flip_x || false
     options.flip_y = options.flip_y || false
     options.rotate = options.rotate || 0
-    options.use_barycenter_ratio = options.use_barycenter_ratio = 0.5 // Between 0 and 1
+    options.use_barycenter_ratio = options.use_barycenter_ratio || .2 // Between 0 (center for borders) and 1 (center for mass)
     options.contain_in_inscribed_circle = options.contain_in_inscribed_circle || false
-    options.margin_bottom = (options.margin_bottom === undefined)?(24):(options.margin_bottom) // in mm, space for the text etc.
-    options.margin_right  = (options.margin_right  === undefined)?(12):(options.margin_right ) // in mm, space for the text etc.
-    options.margin_left   = (options.margin_left   === undefined)?(3 ):(options.margin_left  ) // in mm, space for the text etc.
-    options.margin_top    = (options.margin_top    === undefined)?(6 ):(options.margin_top   ) // in mm, space for the text etc.
+    options.margin_bottom = (options.margin_bottom === undefined)?( 6):(options.margin_bottom) // in mm, space for the text etc.
+    options.margin_right  = (options.margin_right  === undefined)?( 6):(options.margin_right ) // in mm, space for the text etc.
+    options.margin_left   = (options.margin_left   === undefined)?( 6):(options.margin_left  ) // in mm, space for the text etc.
+    options.margin_top    = (options.margin_top    === undefined)?( 6):(options.margin_top   ) // in mm, space for the text etc.
 
     var g = ns.g
     let dim = ns.getRenderingPixelDimensions()
@@ -3807,6 +3074,14 @@ newRenderer = function(){
 
   ns.pt_to_pt = function(d) {
     return Math.round(1000 * d * ns.settings.rendering_dpi / ( 72 * ns.settings.tile_factor )) / 1000
+  }
+
+  ns.pt_to_mm = function(d) {
+    return Math.round(1000 * d * 0.35277777777778) / 1000
+  }
+
+  ns.pt_to_px = function(d) {
+    return ns.mm_to_px(ns.pt_to_mm(d))
   }
 
   ns.downloadImageData = function(imgd, name) {
@@ -4041,5 +3316,5 @@ newRenderer = function(){
 
 /// FINALLY, RENDER
 let renderer = newRenderer()
-renderer.renderAndSave(g, settings)
-//renderer.renderAndSaveAllTiles(g, settings)
+//renderer.renderAndSave(g, settings)
+renderer.renderAndSaveAllTiles(g, settings)
