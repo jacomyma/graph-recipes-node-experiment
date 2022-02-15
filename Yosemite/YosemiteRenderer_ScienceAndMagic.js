@@ -23,7 +23,7 @@ console.log('GEXF parsed');
 // are up to 1480 x 5000 mm and 1440 or even 2880 dpi.
 // https://www.pixartprinting.fr/grand-format/impression-poster-haute-qualite/
 //
-// The script works (for me) eith 1000 x 1000 mm and 1440 dpi.
+// The script works (for me) with 1000 x 1000 mm and 1440 dpi.
 
 /// EDIT SETTINGS BELOW
 
@@ -32,8 +32,8 @@ var settings = {}
 // Image size and resolution
 settings.image_width = 1000 // in mm. Default: 200mm (fits in a A4 page)
 settings.image_height = 500
-settings.output_dpi = 72 // Dots per inch.
-settings.rendering_dpi = 72 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
+settings.output_dpi = 300 // Dots per inch.
+settings.rendering_dpi = 300 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
 
 // Tiling:
 // Tiling allows to build images that would be otherwise too large.
@@ -62,7 +62,7 @@ settings.draw_cluster_labels = false
 settings.draw_edges = false
 settings.draw_nodes = false
 settings.draw_node_labels = true
-settings.draw_hillshading = false
+settings.draw_hillshading = true
 settings.draw_connected_closeness = false
 
 // Misc.
@@ -2250,7 +2250,7 @@ newRenderer = function(){
 
     if (options.label_curved_path) {
       // Experiment HERE
-      options.label_path_step = 2; // In mm
+      options.label_path_step = .5; // In mm
 
       /// Unpack hillshading data
       var shadingData = ns.getHillshadingData()
@@ -2319,6 +2319,14 @@ newRenderer = function(){
             )
       }
 
+      // Compute scale for labels
+      var label_nodeSizeExtent = d3.extent(
+        g.nodes().map(function(nid){
+          return g.getNodeAttribute(nid, "size")
+        })
+      )
+      if (label_nodeSizeExtent[0] == label_nodeSizeExtent[1]) {label_nodeSizeExtent[0] *= 0.9}
+
       // Compute each label's path
       var step_length = ns.mm_to_px(options.label_path_step);
       var labelPaths = {}
@@ -2328,6 +2336,19 @@ newRenderer = function(){
         var ny = n.y
         var label = ns.truncateWithEllipsis(n.label.replace(/^https*:\/\/(www\.)*/gi, ''), options.label_max_length)
 
+        var fontSize = ns.pt_to_pt( options.sized_labels
+          ? Math.floor(options.label_font_min_size + (n.size - label_nodeSizeExtent[0]) * (options.label_font_max_size - options.label_font_min_size) / (label_nodeSizeExtent[1] - label_nodeSizeExtent[0]))
+          : Math.floor(0.8 * options.label_font_min_size + 0.2 * options.label_font_max_size)
+        )
+        
+        // sw: Size and weight
+        var sw = normalizeFontSize(fontSize)
+        if (!options.true_size) {
+          fontSize = sw[0]
+        }
+        var fontWeight = sw[1]
+        ctx.font = ns.buildContextFontString(fontWeight, fontSize, options.label_font_family)
+        
         // Let's get the label length
         var labelLength = ctx.measureText(label).width
 
@@ -2336,8 +2357,10 @@ newRenderer = function(){
         var pathLength = 0
         // Set the central segment
         var i = Math.floor(nx) + Math.floor(ny)*dim.w*ns.settings.tile_factor
-        var dx = -dyPixelMap[i]
-        var dy = dxPixelMap[i]
+        var dx = dxPixelMap[i]
+        var dy = dyPixelMap[i]
+        // var dx = -dyPixelMap[i]
+        // var dy = dxPixelMap[i]
         var ratio = step_length / Math.sqrt(dx*dx+dy*dy)
         path.push([nx - 0.5*dx*ratio, ny - 0.5*dy*ratio])
         path.push([nx + 0.5*dx*ratio, ny + 0.5*dy*ratio])
@@ -2347,22 +2370,25 @@ newRenderer = function(){
           // Extend the path on the right side
           point = path[path.length - 1]
           i = Math.floor(point[0]) + Math.floor(point[1])*dim.w*ns.settings.tile_factor
-          dx = -dyPixelMap[i]
-          dy = dxPixelMap[i]
-          ratio = step_length / Math.sqrt(dx*dx+dy*dy)
+          dx = dxPixelMap[i]
+          dy = dyPixelMap[i]
+          // dx = -dyPixelMap[i]
+          // dy = dxPixelMap[i]
+          // ratio = step_length / Math.sqrt(dx*dx+dy*dy)
           path.push([point[0]+dx*ratio, point[1]+dy*ratio])
           // Extend the path on the right side
           point = path[0]
           i = Math.floor(point[0]) + Math.floor(point[1])*dim.w*ns.settings.tile_factor
-          dx = -dyPixelMap[i]
-          dy = dxPixelMap[i]
-          ratio = step_length / Math.sqrt(dx*dx+dy*dy)
+          dx = dxPixelMap[i]
+          dy = dyPixelMap[i]
+          // dx = -dyPixelMap[i]
+          // dy = dxPixelMap[i]
+          // ratio = step_length / Math.sqrt(dx*dx+dy*dy)
           path.unshift([point[0]-dx*ratio, point[1]-dy*ratio])
           pathLength += 2*step_length
         }
         labelPaths[nid] = path
       })
-
 
       var labelsStack = []
       var visibleLabels = g.nodes()
@@ -2386,14 +2412,6 @@ newRenderer = function(){
 
       // Draw text
       labelsStack.forEach(function(l){
-        /*ctx.font = l.font
-        ctx.lineWidth = 0
-        ctx.fillStyle = l.color.toString()
-        ctx.fillText(
-          l.label
-        , l.x
-        , l.y
-        )*/
         
         // Draw dot
         ctx.fillStyle = "#090";
@@ -2401,6 +2419,7 @@ newRenderer = function(){
         ctx.arc(l.x, l.y, 2.5, 0, 2 * Math.PI);
         ctx.fill();
 
+        // Draw path
         var x = l.path[0][0]
         var y = l.path[0][1]
         var x2, y2
@@ -2420,6 +2439,26 @@ newRenderer = function(){
           x = x2
           y = y2
         }
+
+        // Draw label
+        ctx.font = l.font
+        ctx.lineWidth = 0
+        ctx.fillStyle = l.color.toString()
+        ctx.textAlign = 'center'
+         
+        function measureText(text) {
+          return ctx.measureText(text).width;
+        }
+         
+        function draw(letter, x, y, angle) {
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(angle);
+          ctx.fillText(letter, 0, 0);
+          ctx.restore();
+        }
+         
+        ns.textPath(l.label, l.path, measureText, draw, 'center');
 
       })
 
@@ -4096,6 +4135,10 @@ newRenderer = function(){
       return Delta_max;
     }
   }
+
+  //// TextPath
+  // From https://www.npmjs.com/package/textpath
+  ns.textPath=function(t){function r(a){if(e[a])return e[a].exports;var n=e[a]={i:a,l:!1,exports:{}};return t[a].call(n.exports,n,n.exports,r),n.l=!0,n.exports}var e={};return r.m=t,r.c=e,r.d=function(t,e,a){r.o(t,e)||Object.defineProperty(t,e,{configurable:!1,enumerable:!0,get:a})},r.n=function(t){var e=t&&t.__esModule?function(){return t.default}:function(){return t};return r.d(e,"a",e),e},r.o=function(t,r){return Object.prototype.hasOwnProperty.call(t,r)},r.p="",r(r.s=0)}([function(t,r,e){"use strict";function a(t,r,e,a,n){for(var o=0,u=r[0],f=1,h=r.length;f<h;++f){var l=r[f];o+=Math.sqrt(Math.pow(l[0]-u[0],2)+Math.pow(l[1]-u[1],2)),u=l}var p=e(t),c="left"==n?0:"right"==n?1:.5,i=(o-p)*c,s=0,M=r.length,v=r[s][0]>r[M-1][0],d=t.length,w=r[s][0],x=r[s][1];s+=1;for(var g,P=r[s][0],b=r[s][1],y=0,O=Math.sqrt(Math.pow(P-w,2)+Math.pow(b-x,2)),f=0;f<d;++f){g=v?d-f-1:f;for(var _=t[g],j=e(_),q=i+j/2;s<M-1&&y+O<q;)w=P,x=b,s+=1,P=r[s][0],b=r[s][1],y+=O,O=Math.sqrt(Math.pow(P-w,2)+Math.pow(b-x,2));var m=q-y,I=Math.atan2(b-x,P-w);v&&(I+=I>0?-Math.PI:Math.PI);var k=m/O;a(_,w+k*(P-w),x+k*(b-x),I),i+=j}}Object.defineProperty(r,"__esModule",{value:!0}),r.default=a,t.exports=r.default}]);
 
   //// LOG
   ns.log = function(txt) {
