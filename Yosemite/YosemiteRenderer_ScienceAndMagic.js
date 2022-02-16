@@ -62,7 +62,7 @@ settings.draw_cluster_labels = false
 settings.draw_edges = false
 settings.draw_nodes = false
 settings.draw_node_labels = true
-settings.draw_hillshading = true
+settings.draw_hillshading = false
 settings.draw_connected_closeness = false
 
 // Misc.
@@ -2213,7 +2213,10 @@ newRenderer = function(){
     options.label_border_thickness = options.label_border_thickness || 1. // In mm
     options.label_border_color = options.label_border_color || "#FFF"
     options.label_curved_path = (options.label_curved_path===undefined)?(false):(options.label_curved_path)
-    
+    options.label_path_step = .5; // In mm
+    options.label_path_downhill = false
+    options.label_path_center = false
+
     // Deal with font weights
     //  Relative thicknesses for: Raleway
     var weights =     [ 100, 200, 300, 400, 500, 600, 700, 800, 900 ]
@@ -2250,7 +2253,20 @@ newRenderer = function(){
 
     if (options.label_curved_path) {
       // Experiment HERE
-      options.label_path_step = .5; // In mm
+
+      // Prepare text path draw functions
+      var textPath_measureText = function(text) {
+        return ctx.measureText(text).width;
+      }
+      var textPath_draw = function(letter, x, y, angle) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.translate(0, 0.2 * ctx.font.split('px')[0]);
+        ctx.fillText(letter, 0, 0);
+        ctx.restore();
+      }
+
 
       /// Unpack hillshading data
       var shadingData = ns.getHillshadingData()
@@ -2352,40 +2368,48 @@ newRenderer = function(){
         // Let's get the label length
         var labelLength = ctx.measureText(label).width
 
-        // We assume the label is centered, so the path has a central segment
+        // For simplicity, the path always has a "central" segment
+        var angle
         var path = []
         var pathLength = 0
         // Set the central segment
         var i = Math.floor(nx) + Math.floor(ny)*dim.w*ns.settings.tile_factor
-        var dx = dxPixelMap[i]
-        var dy = dyPixelMap[i]
-        // var dx = -dyPixelMap[i]
-        // var dy = dxPixelMap[i]
-        var ratio = step_length / Math.sqrt(dx*dx+dy*dy)
-        path.push([nx - 0.5*dx*ratio, ny - 0.5*dy*ratio])
-        path.push([nx + 0.5*dx*ratio, ny + 0.5*dy*ratio])
+        if (options.label_path_downhill) {
+          angle = Math.atan2(dyPixelMap[i], dxPixelMap[i])
+        } else {
+          angle = Math.atan2(dxPixelMap[i], -dyPixelMap[i])
+        }
+        path.push([nx - 0.5*step_length*Math.cos(angle), ny - 0.5*step_length*Math.sin(angle)])
+        path.push([nx + 0.5*step_length*Math.cos(angle), ny + 0.5*step_length*Math.sin(angle)])
         pathLength += step_length
         var point
-        while (pathLength < labelLength) {
-          // Extend the path on the right side
+        
+        // Extend the path forward (to the right)
+        while (pathLength < ((options.label_path_center)?(labelLength/2):(labelLength))) {
           point = path[path.length - 1]
           i = Math.floor(point[0]) + Math.floor(point[1])*dim.w*ns.settings.tile_factor
-          dx = dxPixelMap[i]
-          dy = dyPixelMap[i]
-          // dx = -dyPixelMap[i]
-          // dy = dxPixelMap[i]
-          // ratio = step_length / Math.sqrt(dx*dx+dy*dy)
-          path.push([point[0]+dx*ratio, point[1]+dy*ratio])
-          // Extend the path on the right side
-          point = path[0]
-          i = Math.floor(point[0]) + Math.floor(point[1])*dim.w*ns.settings.tile_factor
-          dx = dxPixelMap[i]
-          dy = dyPixelMap[i]
-          // dx = -dyPixelMap[i]
-          // dy = dxPixelMap[i]
-          // ratio = step_length / Math.sqrt(dx*dx+dy*dy)
-          path.unshift([point[0]-dx*ratio, point[1]-dy*ratio])
-          pathLength += 2*step_length
+          if (options.label_path_downhill) {
+            angle = Math.atan2(dyPixelMap[i], dxPixelMap[i])
+          } else {
+            angle = Math.atan2(dxPixelMap[i], -dyPixelMap[i])
+          }
+          path.push([point[0]+step_length*Math.cos(angle), point[1]+step_length*Math.sin(angle)])
+          pathLength += step_length
+        }
+
+        if (options.label_path_center) {
+          // Extend the path backwards (to the left)
+          while (pathLength < labelLength) {
+            point = path[0]
+            i = Math.floor(point[0]) + Math.floor(point[1])*dim.w*ns.settings.tile_factor
+            if (options.label_path_downhill) {
+              angle = Math.atan2(dyPixelMap[i], dxPixelMap[i])
+            } else {
+              angle = Math.atan2(dxPixelMap[i], -dyPixelMap[i])
+            }
+            path.unshift([point[0]-step_length*Math.cos(angle), point[1]-step_length*Math.sin(angle)])
+            pathLength += step_length
+          }
         }
         labelPaths[nid] = path
       })
@@ -2416,7 +2440,7 @@ newRenderer = function(){
         // Draw dot
         ctx.fillStyle = "#090";
         ctx.beginPath();
-        ctx.arc(l.x, l.y, 2.5, 0, 2 * Math.PI);
+        ctx.arc(l.x, l.y, 3.5, 0, 2 * Math.PI);
         ctx.fill();
 
         // Draw path
@@ -2431,7 +2455,7 @@ newRenderer = function(){
           ctx.lineJoin = "round"
           ctx.beginPath()
           ctx.lineWidth = 2
-          ctx.strokeStyle = "#036";
+          ctx.strokeStyle = "#"+Math.floor(Math.random()*16777215).toString(16); //"#036";
           ctx.moveTo(x, y)
           ctx.lineTo(x2, y2)
           ctx.stroke()
@@ -2441,28 +2465,16 @@ newRenderer = function(){
         }
 
         // Draw label
+        
         ctx.font = l.font
         ctx.lineWidth = 0
         ctx.fillStyle = l.color.toString()
         ctx.textAlign = 'center'
-         
-        function measureText(text) {
-          return ctx.measureText(text).width;
-        }
-         
-        function draw(letter, x, y, angle) {
-          ctx.save();
-          ctx.translate(x, y);
-          ctx.rotate(angle);
-          ctx.fillText(letter, 0, 0);
-          ctx.restore();
-        }
-         
-        ns.textPath(l.label, l.path, measureText, draw, 'center');
-
+                 
+        ns.textPath(l.label, l.path, textPath_measureText, textPath_draw, 'center');
+        
       })
 
-      ns.report("...done.")
       return ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
 
     }
