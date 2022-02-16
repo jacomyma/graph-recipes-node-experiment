@@ -2886,7 +2886,7 @@ newRenderer = function(){
     ns.log2("Precompute visible node labels...")
 
     options = options || {}
-    options.pixmap_max_resolution = options.pixmap_max_resolution || 100000000 // 100 megapixel
+    options.pixmap_max_resolution = options.pixmap_max_resolution || 10000000 // 10 megapixel
     // For monitoring
     options.download_image = true // For monitoring the process
 
@@ -2894,24 +2894,34 @@ newRenderer = function(){
 
     var dim = ns.getRenderingPixelDimensions()
     var g = ns.g
-    var tf = ns.settings.tile_factor
-    var ctx = ns.createCanvas().getContext("2d")
-    ns.scaleContext(ctx)
-    ns.paintAll(ctx, '#FFF') // Useful for monitoring
 
     // Reverse nodes by size order
     var nodesBySize = ns.getNodesBySize().slice(0)
     nodesBySize.reverse()
 
-    // Init a pixel map of int for bounding boxes
-    var pixmapReduceFactor = Math.max(1, dim.w * dim.h / options.pixmap_max_resolution)
-    console.log("Label pixmap reduction factor:", pixmapReduceFactor)
-    var pixmapWidth = Math.ceil(dim.w/pixmapReduceFactor)
-    var pixmapHeight = Math.ceil(dim.h/pixmapReduceFactor)
-    var bbPixmap = new Uint8Array(pixmapWidth * pixmapHeight)
-    for (i in bbPixmap) {
-      bbPixmap[i] = 0 // 1 means "occupied"
+    // Ratio
+    var ratio, width, height
+    if (dim.w*dim.h>options.pixmap_max_resolution) {
+      ratio = Math.sqrt(options.pixmap_max_resolution/(dim.w*dim.h))
+      width = Math.floor(ratio*dim.w)
+      height = Math.floor(ratio*dim.h)
+    } else {
+      ratio = 1
+      width = dim.w
+      height = dim.h
     }
+    console.log("Label collision map ratio:",ratio,"- Dimensions: "+width+" x "+height)
+
+    var ctx = ns.createCanvas().getContext("2d")
+    ctx.canvas.width = width
+    ctx.canvas.height = height
+    ctx.scale(ratio, ratio)
+    // Paint all white
+    ctx.beginPath()
+    ctx.rect(0, 0, dim.w, dim.h)
+    ctx.fillStyle = "#000"
+    ctx.fill()
+    ctx.closePath()
 
     // Compute scale for labels
     var label_nodeSizeExtent = d3.extent(
@@ -2930,6 +2940,7 @@ newRenderer = function(){
         var n = g.getNodeAttributes(nid)
         var nx = n.x
         var ny = n.y
+        var path = labelPaths[nid]
 
         var fontSize = ns.pt_to_pt( options.sized_labels
           ? Math.floor(options.label_font_min_size + (n.size - label_nodeSizeExtent[0]) * (options.label_font_max_size - options.label_font_min_size) / (label_nodeSizeExtent[1] - label_nodeSizeExtent[0]))
@@ -2952,32 +2963,94 @@ newRenderer = function(){
 
         var label = ns.truncateWithEllipsis(n.label.replace(/^https*:\/\/(www\.)*/gi, ''), options.label_max_length)
 
-        // Bounding box
-        //var bbox = ns.getBBox(ctx, fontSize, labelCoordinates, label, options.label_spacing_factor, margin)
-        
+        // Create new empty canvas
+        var ctx2 = ns.createCanvas().getContext("2d")
+        ctx2.canvas.width = width
+        ctx2.canvas.height = height
+        ctx2.scale(ratio, ratio)
+        // Paint all white
+        ctx2.beginPath()
+        ctx2.rect(0, 0, dim.w, dim.h)
+        ctx2.fillStyle = "#000"
+        ctx2.fill()
+        ctx2.closePath()
+
+        // Draw the bounding area on that canvas
+        var pathxmin = width
+        var pathxmax = 0
+        var pathymin = height
+        var pathymax = 0
+        var offset = (fontSize * options.label_spacing_factor - fontSize)/2 + margin
+        ctx2.strokeStyle = '#FFF'
+        ctx2.lineCap = 'round';
+        ctx2.lineJoin = 'round';
+        ctx2.lineWidth = fontSize + 2*offset;
+        ctx2.beginPath()
+        var x, y
+        x = path[0][0]
+        y = path[0][1]
+        ctx2.moveTo(x, y)
+        pathxmin = Math.min(pathxmin, x)
+        pathxmax = Math.max(pathxmax, x)
+        pathymin = Math.min(pathymin, y)
+        pathymax = Math.max(pathymax, y)
+        for (let pi=1; pi<path.length; pi++){
+          x = path[pi][0]
+          y = path[pi][1]
+          ctx2.lineTo(x, y)
+          pathxmin = Math.min(pathxmin, x)
+          pathxmax = Math.max(pathxmax, x)
+          pathymin = Math.min(pathymin, y)
+          pathymax = Math.max(pathymax, y)
+        }
+        ctx2.stroke()
+
+        // Merge with the other canvas
+        ctx2.globalCompositeOperation = "multiply"
+        ctx2.setTransform(1, 0, 0, 1, 0, 0);
+        ctx2.drawImage(ctx.canvas, 0, 0)
+        ctx2.scale(ratio, ratio)
+
         // Test bounding box collision
         var collision = false
-        /*var bboxResizedX = Math.floor(bbox.x/pixmapReduceFactor)
-        var bboxResizedY = Math.floor(bbox.y/pixmapReduceFactor)
-        var bboxResizedX2 = Math.ceil((bbox.x + bbox.width)/pixmapReduceFactor)
-        var bboxResizedY2 = Math.ceil((bbox.y + bbox.height)/pixmapReduceFactor)
-        for (x = bboxResizedX; x<bboxResizedX2; x++) {
-          for (y = bboxResizedY; y<bboxResizedY2; y++) {
-            if (bbPixmap[x + (y*pixmapWidth)] == 1) {
+        // var imgd = ctx2.getImageData(0, 0, width, height).data
+        if (!isNaN(pathxmin) && !isNaN(pathxmax) && !isNaN(pathymin) && !isNaN(pathymax)) {
+          var imgd = ctx2.getImageData(
+            Math.max(0, pathxmin-offset),
+            Math.max(0, pathymin-offset),
+            Math.min(width, pathxmax-pathxmin + 2*offset),
+            Math.min(height, pathymax-pathymin + 2*offset),
+          ).data
+          for (let i = 0; i < imgd.length; i += 4) {
+            if (imgd[i] > 0) {
               collision = true
-              break
               break
             }
           }
-        }*/
+        } else {
+          collision = true
+          console.log("Warning: NaN path for "+nid+" "+label)
+        }
+
         if (!collision) {
 
-          // Update bounding box data
-          /*for (x = bboxResizedX; x<bboxResizedX2; x++) {
-            for (y = bboxResizedY; y<bboxResizedY2; y++) {
-              bbPixmap[x + (y*pixmapWidth)] = 1
-            }
-          }*/
+          // Draw the bounding area on that canvas
+          var offset = (fontSize * options.label_spacing_factor - fontSize)/2 + margin
+          ctx.strokeStyle = '#FFF'
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.lineWidth = fontSize + 2*offset;
+          ctx.beginPath()
+          var x, y
+          x = path[0][0]
+          y = path[0][1]
+          ctx.moveTo(x, y)
+          for (let pi=1; pi<path.length; pi++){
+            x = path[pi][0]
+            y = path[pi][1]
+            ctx.lineTo(x, y)
+          }
+          ctx.stroke()
 
           // Update count
           labelDrawCount--
@@ -2986,29 +3059,27 @@ newRenderer = function(){
           visibleLabels.push(nid)
 
           if (options.download_image) {
-            var path = labelPaths[nid]
-
             // Draw bounding area
-            var offset = (fontSize * options.label_spacing_factor - fontSize)/2 + margin
-            ctx.strokeStyle = 'rgb(200, 200, 200)'
+            /*var offset = (fontSize * options.label_spacing_factor - fontSize)/2 + margin
+            ctx.strokeStyle = '#FFF'
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.lineWidth = fontSize + 2*offset;
             ctx.beginPath()
             var x, y
-            x = path[0][0]*pixmapReduceFactor
-            y = path[0][1]*pixmapReduceFactor
+            x = path[0][0]
+            y = path[0][1]
             ctx.moveTo(x, y)
             for (let pi=1; pi<path.length; pi++){
-              x = path[pi][0]*pixmapReduceFactor
-              y = path[pi][1]*pixmapReduceFactor
+              x = path[pi][0]
+              y = path[pi][1]
               ctx.lineTo(x, y)
             }
-            ctx.stroke()
+            ctx.stroke()*/
   
             // Draw label
             ctx.lineWidth = 0
-            ctx.fillStyle = '#000'
+            ctx.fillStyle = '#F00'
             ctx.textAlign = 'center'
             
             if (options.label_curved_path) {
@@ -3028,7 +3099,7 @@ newRenderer = function(){
     })
 
     if (options.download_image) {
-      var imgd = ctx.getImageData(0, 0, dim.w, dim.h)
+      var imgd = ctx.getImageData(0, 0, width, height)
       ns.downloadImageData(imgd, 'Labels monitoring')
     }
     
@@ -4268,7 +4339,7 @@ newRenderer = function(){
 
   ns.downloadImageData = function(imgd, name) {
     // New Canvas
-    var canvas = ns.createCanvas(imgd.width, imgd.height)
+    var canvas = createCanvas(imgd.width, imgd.height)
     var ctx = canvas.getContext("2d")
 
     // Paint imgd
