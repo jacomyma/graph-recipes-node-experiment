@@ -2214,8 +2214,10 @@ newRenderer = function(){
     options.label_border_color = options.label_border_color || "#FFF"
     options.label_curved_path = (options.label_curved_path===undefined)?(false):(options.label_curved_path)
     options.label_path_step = .5; // In mm
-    options.label_path_downhill = false
+    options.label_path_downhill = true
     options.label_path_center = false
+    options.label_path_starting_angle_range = Math.PI/2 // From 0 (horizontal) to PI (any angle)
+    options.label_path_step_angle_range = Math.PI/32 // From 0 (straight) to PI (any curvature)
 
     // Deal with font weights
     //  Relative thicknesses for: Raleway
@@ -2379,6 +2381,19 @@ newRenderer = function(){
         } else {
           angle = Math.atan2(dxPixelMap[i], -dyPixelMap[i])
         }
+        // Note: angle is in [-PI, PI] at this stage
+        if (Math.PI/2 < angle && angle < Math.PI - options.label_path_starting_angle_range/2) {
+          angle = Math.PI - options.label_path_starting_angle_range/2
+        } else if (options.label_path_starting_angle_range/2 < angle && angle < Math.PI/2 ) {
+          angle = options.label_path_starting_angle_range/2
+        } else if (-Math.PI/2 < angle && angle < -options.label_path_starting_angle_range/2 ) {
+          angle = -options.label_path_starting_angle_range/2
+        } else if (-Math.PI + options.label_path_starting_angle_range/2 < angle && angle < -Math.PI/2 ) {
+          angle = -Math.PI + options.label_path_starting_angle_range/2
+        }
+
+        var initAngle = angle
+        var lastAngle = angle
         path.push([nx - 0.5*step_length*Math.cos(angle), ny - 0.5*step_length*Math.sin(angle)])
         path.push([nx + 0.5*step_length*Math.cos(angle), ny + 0.5*step_length*Math.sin(angle)])
         pathLength += step_length
@@ -2393,11 +2408,26 @@ newRenderer = function(){
           } else {
             angle = Math.atan2(dxPixelMap[i], -dyPixelMap[i])
           }
+          angleDiff = angle-lastAngle
+          while (angleDiff <= -Math.PI) {
+            angleDiff += 2*Math.PI
+          }
+          while (angleDiff > Math.PI) {
+            angleDiff -= 2*Math.PI
+          }
+          if (angleDiff > options.label_path_step_angle_range) {
+            angleDiff = options.label_path_step_angle_range
+          } else if (angleDiff < -options.label_path_step_angle_range) {
+            angleDiff = -options.label_path_step_angle_range
+          }
+          angle = lastAngle + angleDiff
           path.push([point[0]+step_length*Math.cos(angle), point[1]+step_length*Math.sin(angle)])
+          lastAngle = angle
           pathLength += step_length
         }
 
         if (options.label_path_center) {
+          lastAngle = initAngle
           // Extend the path backwards (to the left)
           while (pathLength < labelLength) {
             point = path[0]
@@ -2407,7 +2437,21 @@ newRenderer = function(){
             } else {
               angle = Math.atan2(dxPixelMap[i], -dyPixelMap[i])
             }
+            angleDiff = angle-lastAngle
+            while (angleDiff <= -Math.PI) {
+              angleDiff += 2*Math.PI
+            }
+            while (angleDiff > Math.PI) {
+              angleDiff -= 2*Math.PI
+            }
+            if (angleDiff > options.label_path_step_angle_range) {
+              angleDiff = options.label_path_step_angle_range
+            } else if (angleDiff < -options.label_path_step_angle_range) {
+              angleDiff = -options.label_path_step_angle_range
+            }
+            angle = lastAngle + angleDiff
             path.unshift([point[0]-step_length*Math.cos(angle), point[1]-step_length*Math.sin(angle)])
+            lastAngle = angle
             pathLength += step_length
           }
         }
