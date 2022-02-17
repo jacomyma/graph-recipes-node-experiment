@@ -129,14 +129,14 @@ settings.node_stroke_color = "#4f432f"
 settings.node_fill_color = "#ecd0a1"
 
 // Layer: Node labels
-settings.label_color = "#4f432f"
+settings.label_color = "#41331c" //"#4f432f"
 settings.label_max_length = 42 // Number of characters before truncate. Infinity is a valid value.
 settings.label_font_family = "Book Antiqua"
 settings.label_font_min_size = 8 // in pt
-settings.label_font_max_size = 8  // in pt
-settings.label_font_thickness = .15
-settings.label_border_thickness = .8 // in mm
-settings.label_spacing_offset = 1.5 // in mm (prevents label overlap)
+settings.label_font_max_size = 8 // in pt
+settings.label_font_thickness = .18
+settings.label_border_thickness = 0 // in mm
+settings.label_spacing_offset = .2 // in mm (prevents label overlap)
 settings.label_border_color = settings.background_color
 settings.label_curved_path = true // Curved labels
 
@@ -155,7 +155,7 @@ settings.heatmap_spreading = 12 // in mm
 
 // Experimental stuff
 settings.hillshading_strength = 12 // Elevation factor
-settings.hillshading_color = "#4f432f"
+settings.hillshading_color = "#968364" //"#4f432f"
 settings.hillshading_alpha = 1. // Opacity
 settings.hillshading_sun_azimuth = Math.PI * 0.6 // angle in radians
 settings.hillshading_sun_elevation = Math.PI * 0.4 // angle in radians
@@ -2244,15 +2244,15 @@ newRenderer = function(){
     options.label_font_min_size = options.label_font_min_size || 7 // In pt
     options.label_font_max_size = options.label_font_max_size || 14 // In pt
     options.label_font_thickness = options.label_font_thickness || .3 // In mm
-    options.label_border_thickness = options.label_border_thickness || 1. // In mm
+    options.label_border_thickness = (options.label_border_thickness===undefined)?(1.):(options.label_border_thickness) // In mm
     options.label_border_color = options.label_border_color || "#FFF"
     options.label_curved_path = (options.label_curved_path===undefined)?(false):(options.label_curved_path)
     options.label_path_step = .5; // In mm
     options.label_path_downhill = true
     options.label_path_center = false
     options.label_path_starting_angle_range = Math.PI/2 // From 0 (horizontal) to PI (any angle)
-    options.label_path_step_angle_range = Math.PI/32 // From 0 (straight) to PI (any curvature)
-    
+    options.label_path_step_angle_range = Math.PI/64 // From 0 (straight) to PI (any curvature)
+
     var g = ns.g
     var dim = ns.getRenderingPixelDimensions()
     var ctx = ns.createCanvas().getContext("2d")
@@ -2311,32 +2311,34 @@ newRenderer = function(){
       labelsStack.push(l)
     })
     
-    
-    // Draw borders
     ctx.textAlign = "center"
     ctx.lineCap = "round"
     ctx.lineJoin = "round"
-    labelsStack.forEach(function(l){
-      ctx.font = l.font
-      ctx.lineWidth = borderThickness
-      ctx.fillStyle = options.label_border_color
-      ctx.strokeStyle = options.label_border_color
 
-      if (options.label_curved_path) {
-        ns.drawTextPath(ctx, l.path, l.label, true)
-      } else {
-        ctx.fillText(
-          l.label
-        , l.x
-        , l.y
-        )
-        ctx.strokeText(
-          l.label
-        , l.x
-        , l.y
-        )
-      }
-    })
+    // Draw borders
+    if (borderThickness > 0) {
+      labelsStack.forEach(function(l){
+        ctx.font = l.font
+        ctx.lineWidth = borderThickness
+        ctx.fillStyle = options.label_border_color
+        ctx.strokeStyle = options.label_border_color
+
+        if (options.label_curved_path) {
+          ns.drawTextPath(ctx, l.path, l.label, true)
+        } else {
+          ctx.fillText(
+            l.label
+          , l.x
+          , l.y
+          )
+          ctx.strokeText(
+            l.label
+          , l.x
+          , l.y
+          )
+        }
+      })
+    }
 
     // Draw text
     labelsStack.forEach(function(l){
