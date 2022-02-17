@@ -2193,35 +2193,9 @@ newRenderer = function(){
     return ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
   }
 
-  ns.drawNodeLabelsLayer = function(options) {
-    ns.log("Draw node labels...")
-    
+  ns.getNormalizeFontSize = function(options) {
     options = options || {}
-    options.label_count = options.label_count || Infinity // Only (try to) display a number of labels
-    options.label_max_length = options.label_max_length || Infinity // Max characters (else an ellipsis is used)
-    options.colored_labels = (options.colored_labels===undefined)?(true):(options.colored_labels)
-    options.label_color = options.label_color || "#000"
-    options.sized_labels = (options.sized_labels===undefined)?(true):(options.sized_labels)
-    options.node_size = options.node_size || 1 // A scaling factor
-    options.label_true_size = options.label_true_size || false // false: size adjusted to the right thickness (weight)
-    options.label_spacing_factor = options.label_spacing_factor || 1 // 1=normal; 2=box twice as wide/high etc.
-    options.label_spacing_offset = options.label_spacing_offset || 1 // In mm
-    options.label_font_family = options.label_font_family || 'Raleway'
-    options.label_font_min_size = options.label_font_min_size || 7 // In pt
-    options.label_font_max_size = options.label_font_max_size || 14 // In pt
     options.label_font_thickness = options.label_font_thickness || .3 // In mm
-    options.label_border_thickness = options.label_border_thickness || 1. // In mm
-    options.label_border_color = options.label_border_color || "#FFF"
-    options.label_curved_path = (options.label_curved_path===undefined)?(false):(options.label_curved_path)
-    options.label_path_step = .5; // In mm
-    options.label_path_downhill = true
-    options.label_path_center = false
-    options.label_path_starting_angle_range = Math.PI/2 // From 0 (horizontal) to PI (any angle)
-    options.label_path_step_angle_range = Math.PI/32 // From 0 (straight) to PI (any curvature)
-    // Monitoring options
-    options.label_draw_label = true // Default: true. Disable for monitoring only.
-    options.label_path_draw_path = false // Default: false. For monitoring only.
-    options.label_path_draw_anchor = false // Default: false. For monitoring only.
 
     // Deal with font weights
     //  Relative thicknesses for: Raleway
@@ -2250,13 +2224,45 @@ newRenderer = function(){
       return [restrainedSize, actualWeight]
     }
 
+    return normalizeFontSize
+  }
+
+  ns.drawNodeLabelsLayer = function(options) {
+    ns.log("Draw node labels...")
+    
+    options = options || {}
+    options.label_count = options.label_count || Infinity // Only (try to) display a number of labels
+    options.label_max_length = options.label_max_length || Infinity // Max characters (else an ellipsis is used)
+    options.colored_labels = (options.colored_labels===undefined)?(true):(options.colored_labels)
+    options.label_color = options.label_color || "#000"
+    options.sized_labels = (options.sized_labels===undefined)?(true):(options.sized_labels)
+    options.node_size = options.node_size || 1 // A scaling factor
+    options.label_true_size = options.label_true_size || false // false: size adjusted to the right thickness (weight)
+    options.label_spacing_factor = options.label_spacing_factor || 1 // 1=normal; 2=box twice as wide/high etc.
+    options.label_spacing_offset = options.label_spacing_offset || 1 // In mm
+    options.label_font_family = options.label_font_family || 'Raleway'
+    options.label_font_min_size = options.label_font_min_size || 7 // In pt
+    options.label_font_max_size = options.label_font_max_size || 14 // In pt
+    options.label_font_thickness = options.label_font_thickness || .3 // In mm
+    options.label_border_thickness = options.label_border_thickness || 1. // In mm
+    options.label_border_color = options.label_border_color || "#FFF"
+    options.label_curved_path = (options.label_curved_path===undefined)?(false):(options.label_curved_path)
+    options.label_path_step = .5; // In mm
+    options.label_path_downhill = true
+    options.label_path_center = false
+    options.label_path_starting_angle_range = Math.PI/2 // From 0 (horizontal) to PI (any angle)
+    options.label_path_step_angle_range = Math.PI/32 // From 0 (straight) to PI (any curvature)
+    // Monitoring options
+    options.label_draw_label = true // Default: true. Disable for monitoring only.
+    options.label_path_draw_path = false // Default: false. For monitoring only.
+    options.label_path_draw_anchor = false // Default: false. For monitoring only.    
+
     var g = ns.g
     var dim = ns.getRenderingPixelDimensions()
     var ctx = ns.createCanvas().getContext("2d")
     ns.scaleContext(ctx)
 
-
-
+    // TODO: DELETE ME (after integrating stuff below)
     if (false && options.label_curved_path) {
       // Experiment HERE
 
@@ -2536,16 +2542,9 @@ newRenderer = function(){
 
     var i, x, y
 
-    //
-    var visibleLabels = ns.getVisibleLabels(options, normalizeFontSize)
-
-    // Compute scale for labels
-    var label_nodeSizeExtent = d3.extent(
-      g.nodes().map(function(nid){
-        return g.getNodeAttribute(nid, "size")
-      })
-    )
-    if (label_nodeSizeExtent[0] == label_nodeSizeExtent[1]) {label_nodeSizeExtent[0] *= 0.9}
+    // Get visible labels
+    //var normalizeFontSize = ns.getNormalizeFontSize(options)
+    var visibleLabels = ns.getVisibleLabels(options)
 
     // Draw labels
     var labelsStack = []
@@ -2569,18 +2568,8 @@ newRenderer = function(){
       // Precompute the label
       // var color = options.colored_labels ? tuneColorForLabel(ncol) : d3.color('#666')
       var color = d3.color(options.label_color)
-      var fontSize = ns.pt_to_pt( options.sized_labels
-        ? Math.floor(options.label_font_min_size + (n.size - label_nodeSizeExtent[0]) * (options.label_font_max_size - options.label_font_min_size) / (label_nodeSizeExtent[1] - label_nodeSizeExtent[0]))
-        : Math.floor(0.8 * options.label_font_min_size + 0.2 * options.label_font_max_size)
-      )
-      
-      // sw: Size and weight
-      var sw = normalizeFontSize(fontSize)
-      if (!options.true_size) {
-        fontSize = sw[0]
-      }
-      var fontWeight = sw[1]
-      ctx.font = ns.buildContextFontString(fontWeight, fontSize, options.label_font_family)
+      ctx.font = ns.buildLabelFontContext(options, n.size)
+      var fontSize = +ctx.font.split('px')[0]
 
       // Then, draw the label only if wanted
       var radius = Math.max(options.node_size * n.size, 2)
@@ -2641,6 +2630,42 @@ newRenderer = function(){
     return ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
   }
 
+  ns.getNodeSizeExtent = function() {
+    // Cache
+    if (ns._nodeSizeExtent) {
+      return ns._nodeSizeExtent
+    }
+
+    // Compute scale for labels
+    var g = ns.g
+    var nodeSizeExtent = d3.extent(
+      g.nodes().map(function(nid){
+        return g.getNodeAttribute(nid, "size")
+      })
+    )
+    if (nodeSizeExtent[0] == nodeSizeExtent[1]) { nodeSizeExtent[0] *= 0.9 }
+    ns._nodeSizeExtent = nodeSizeExtent
+    return nodeSizeExtent
+  }
+
+  ns.buildLabelFontContext = function(options, node_size) {
+    var nodeSizeExtent = ns.getNodeSizeExtent()
+    var fontSize = ns.pt_to_pt( options.sized_labels
+      ? Math.floor(options.label_font_min_size + (node_size - nodeSizeExtent[0]) * (options.label_font_max_size - options.label_font_min_size) / (nodeSizeExtent[1] - nodeSizeExtent[0]))
+      : Math.floor(0.8 * options.label_font_min_size + 0.2 * options.label_font_max_size)
+    )
+    
+    // sw: Size and weight
+    var normalizeFontSize = ns.getNormalizeFontSize(options)
+    var sw = normalizeFontSize(fontSize)
+    if (!options.true_size) {
+      fontSize = sw[0]
+    }
+    var fontWeight = sw[1]
+
+    return ns.buildContextFontString(fontWeight, fontSize, options.label_font_family)
+  }
+
   ns.getTextPathMeasureText = function(ctx) {
     return function(text) {
       return ctx.measureText(text).width;
@@ -2658,7 +2683,7 @@ newRenderer = function(){
     }
   }
 
-  ns.getLabelPaths = function(options, normalizeFontSize) {
+  ns.getLabelPaths = function(options) {
     // Cache
     if (ns._labelPaths) {
       return ns._labelPaths
@@ -2745,14 +2770,6 @@ newRenderer = function(){
           )
     }
 
-    // Compute scale for labels
-    var label_nodeSizeExtent = d3.extent(
-      g.nodes().map(function(nid){
-        return g.getNodeAttribute(nid, "size")
-      })
-    )
-    if (label_nodeSizeExtent[0] == label_nodeSizeExtent[1]) {label_nodeSizeExtent[0] *= 0.9}
-
     // Compute each label's path
     var step_length = ns.mm_to_px(options.label_path_step);
     g.nodes().forEach(function(nid){
@@ -2761,18 +2778,7 @@ newRenderer = function(){
       var ny = n.y
       var label = ns.truncateWithEllipsis(n.label.replace(/^https*:\/\/(www\.)*/gi, ''), options.label_max_length)
 
-      var fontSize = ns.pt_to_pt( options.sized_labels
-        ? Math.floor(options.label_font_min_size + (n.size - label_nodeSizeExtent[0]) * (options.label_font_max_size - options.label_font_min_size) / (label_nodeSizeExtent[1] - label_nodeSizeExtent[0]))
-        : Math.floor(0.8 * options.label_font_min_size + 0.2 * options.label_font_max_size)
-      )
-      
-      // sw: Size and weight
-      var sw = normalizeFontSize(fontSize)
-      if (!options.true_size) {
-        fontSize = sw[0]
-      }
-      var fontWeight = sw[1]
-      ctx.font = ns.buildContextFontString(fontWeight, fontSize, options.label_font_family)
+      ctx.font = ns.buildLabelFontContext(options, n.size)
       
       // Let's get the label length
       var labelLength = ctx.measureText(label).width
@@ -2872,7 +2878,7 @@ newRenderer = function(){
     return labelPaths
   }
 
-  ns.getVisibleLabels = function(options, normalizeFontSize) {
+  ns.getVisibleLabels = function(options) {
     // Cache
     if (ns._visibleLabels) {
       return ns._visibleLabels
@@ -2880,7 +2886,7 @@ newRenderer = function(){
 
     var labelPaths, textPath_measureText, textPath_draw
     if (options.label_curved_path) {
-      labelPaths = ns.getLabelPaths(options, normalizeFontSize)
+      labelPaths = ns.getLabelPaths(options)
     }
 
     ns.log2("Precompute visible node labels...")
@@ -2888,7 +2894,7 @@ newRenderer = function(){
     options = options || {}
     options.pixmap_max_resolution = options.pixmap_max_resolution || 10000000 // 10 megapixel
     // For monitoring
-    options.download_image = true // For monitoring the process
+    options.download_image = false // For monitoring the process
 
     var i, x, y, visibleLabels = []
 
@@ -2923,47 +2929,23 @@ newRenderer = function(){
     ctx.fill()
     ctx.closePath()
 
-    // Compute scale for labels
-    var label_nodeSizeExtent = d3.extent(
-      nodesBySize.map(function(nid){
-        return g.getNodeAttribute(nid, "size")
-      })
-    )
-    if (label_nodeSizeExtent[0] == label_nodeSizeExtent[1]) { label_nodeSizeExtent[0] *= 0.9 }
-
     // Evaluate labels
     var labelDrawCount = options.label_count
-    var margin = ns.mm_to_px(options.label_spacing_offset)
+    var offset = ns.mm_to_px(options.label_spacing_offset)
+    var count = 0
     nodesBySize.forEach(function(nid){
       if (labelDrawCount > 0) {
-
         var n = g.getNodeAttributes(nid)
         var nx = n.x
         var ny = n.y
         var path = labelPaths[nid]
 
-        var fontSize = ns.pt_to_pt( options.sized_labels
-          ? Math.floor(options.label_font_min_size + (n.size - label_nodeSizeExtent[0]) * (options.label_font_max_size - options.label_font_min_size) / (label_nodeSizeExtent[1] - label_nodeSizeExtent[0]))
-          : Math.floor(0.6 * options.label_font_min_size + 0.4 * options.label_font_max_size)
-        )
-
-        var sw = normalizeFontSize(fontSize) // sw: Size and weight
-        if (!options.true_size) {
-          fontSize = sw[0]
-        }
-        var fontWeight = sw[1]
-        ctx.font = ns.buildContextFontString(fontWeight, fontSize, options.label_font_family)
-
-        var radius = Math.max(options.node_size * n.size, 2)
-        var borderThickness = ns.mm_to_px(options.label_border_thickness)
-        var labelCoordinates = {
-          x: nx,
-          y: ny + 0.25 * fontSize
-        }
+        ctx.font = ns.buildLabelFontContext(options, n.size)
+        var fontSize = +ctx.font.split('px')[0]
 
         var label = ns.truncateWithEllipsis(n.label.replace(/^https*:\/\/(www\.)*/gi, ''), options.label_max_length)
 
-        // Create new empty canvas
+        // Create new empty canvas for the bounding area of that label
         var ctx2 = ns.createCanvas().getContext("2d")
         ctx2.canvas.width = width
         ctx2.canvas.height = height
@@ -2976,15 +2958,16 @@ newRenderer = function(){
         ctx2.closePath()
 
         // Draw the bounding area on that canvas
+        var margin = (fontSize * options.label_spacing_factor - fontSize)/2 + offset
+        var lineWidth = fontSize + 2*margin
+        ctx2.strokeStyle = '#FFF'
+        ctx2.lineCap = 'round';
+        ctx2.lineJoin = 'round';
+        ctx2.lineWidth = pathxmin;
         var pathxmin = width
         var pathxmax = 0
         var pathymin = height
         var pathymax = 0
-        var offset = (fontSize * options.label_spacing_factor - fontSize)/2 + margin
-        ctx2.strokeStyle = '#FFF'
-        ctx2.lineCap = 'round';
-        ctx2.lineJoin = 'round';
-        ctx2.lineWidth = fontSize + 2*offset;
         ctx2.beginPath()
         var x, y
         x = path[0][0]
@@ -3014,13 +2997,14 @@ newRenderer = function(){
         // Test bounding box collision
         var collision = false
         // var imgd = ctx2.getImageData(0, 0, width, height).data
-        if (!isNaN(pathxmin) && !isNaN(pathxmax) && !isNaN(pathymin) && !isNaN(pathymax)) {
-          var imgd = ctx2.getImageData(
-            Math.max(0, pathxmin-offset),
-            Math.max(0, pathymin-offset),
-            Math.min(width, pathxmax-pathxmin + 2*offset),
-            Math.min(height, pathymax-pathymin + 2*offset),
-          ).data
+        var box = {
+          x: Math.max(0, Math.floor(pathxmin-lineWidth/2)),
+          y: Math.max(0, Math.floor(pathymin-lineWidth/2)),
+          w: Math.min(width, Math.ceil(pathxmax+lineWidth/2)-Math.floor(pathxmin-lineWidth/2)),
+          h: Math.min(height, Math.ceil(pathymax+lineWidth/2)-Math.floor(pathymin-lineWidth/2))
+        }
+        if (!isNaN(box.w) && !isNaN(box.h) && box.w>0 && box.h>0) {
+          var imgd = ctx2.getImageData(box.x, box.y, box.w, box.h).data
           for (let i = 0; i < imgd.length; i += 4) {
             if (imgd[i] > 0) {
               collision = true
@@ -3029,17 +3013,15 @@ newRenderer = function(){
           }
         } else {
           collision = true
-          console.log("Warning: NaN path for "+nid+" "+label)
+          console.log("Warning: path issue for "+nid+" ("+label+"):", box)
         }
 
         if (!collision) {
-
           // Draw the bounding area on that canvas
-          var offset = (fontSize * options.label_spacing_factor - fontSize)/2 + margin
           ctx.strokeStyle = '#FFF'
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
-          ctx.lineWidth = fontSize + 2*offset;
+          ctx.lineWidth = fontSize + 2*margin;
           ctx.beginPath()
           var x, y
           x = path[0][0]
@@ -3059,23 +3041,12 @@ newRenderer = function(){
           visibleLabels.push(nid)
 
           if (options.download_image) {
-            // Draw bounding area
-            /*var offset = (fontSize * options.label_spacing_factor - fontSize)/2 + margin
-            ctx.strokeStyle = '#FFF'
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.lineWidth = fontSize + 2*offset;
-            ctx.beginPath()
-            var x, y
-            x = path[0][0]
-            y = path[0][1]
-            ctx.moveTo(x, y)
-            for (let pi=1; pi<path.length; pi++){
-              x = path[pi][0]
-              y = path[pi][1]
-              ctx.lineTo(x, y)
-            }
-            ctx.stroke()*/
+            // Draw bounding area rectangle
+            ctx.beginPath();
+            ctx.lineWidth = .5;
+            ctx.strokeStyle = '#0FF';
+            ctx.rect(box.x, box.y, box.w, box.h)
+            ctx.stroke();
   
             // Draw label
             ctx.lineWidth = 0
@@ -3095,6 +3066,10 @@ newRenderer = function(){
             }
           }
         }
+
+        if (++count%100==0) {
+          ns.log2('...'+count+' labels evaluated...')
+        }
       }
     })
 
@@ -3103,7 +3078,6 @@ newRenderer = function(){
       ns.downloadImageData(imgd, 'Labels monitoring')
     }
     
-
     ns.report2("...done.")
     ns._visibleLabels = visibleLabels
     return visibleLabels
@@ -3151,23 +3125,6 @@ newRenderer = function(){
     //return fontSize + "px " + fontFamily + weightSuffix
     return fontSize + "px '" + fontFamily + weightSuffix + "', sans-serif"
   }
-
-  /*ns.getBBox = function(ctx, fontSize, labelCoordinates, label, factor, offset) {
-    var x = labelCoordinates.x
-    var y = labelCoordinates.y - 0.8 * fontSize
-    var w = ctx.measureText(label).width
-    var h = fontSize
-    var ymargin = (h * factor - h)/2 + offset
-    // Note: we use y margin as x margin too
-    // because labels are wider and we want to have
-    // a homogeneous margin.
-    return {
-      x: x - ymargin - w/2,
-      y: y - ymargin,
-      width: w + 2*ymargin,
-      height: h + 2*ymargin
-    }
-  }*/
 
   ns.drawEdgesLayer = function(options) {
     ns.log("Draw edges...")
