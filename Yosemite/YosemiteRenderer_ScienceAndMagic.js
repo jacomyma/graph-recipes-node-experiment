@@ -2362,7 +2362,7 @@ newRenderer = function(){
         var n = g.getNodeAttributes(nid)
         var nx = n.x
         var ny = n.y
-        var label = ns.truncateWithEllipsis(n.label.replace(/^https*:\/\/(www\.)*/gi, ''), options.label_max_length)
+        var label = ns.tuneLabelString(n.label, options)
 
         var fontSize = ns.pt_to_pt( options.sized_labels
           ? Math.floor(options.label_font_min_size + (n.size - label_nodeSizeExtent[0]) * (options.label_font_max_size - options.label_font_min_size) / (label_nodeSizeExtent[1] - label_nodeSizeExtent[0]))
@@ -2474,7 +2474,7 @@ newRenderer = function(){
         var n = g.getNodeAttributes(nid)
         var nx = n.x
         var ny = n.y
-        var label = ns.truncateWithEllipsis(n.label.replace(/^https*:\/\/(www\.)*/gi, ''), options.label_max_length)
+        var label = ns.tuneLabelString(n.label, options)
         var path = labelPaths[nid]
         // Add to draw pipe
         var l = {
@@ -2578,7 +2578,7 @@ newRenderer = function(){
         y: ny + 0.25 * fontSize
       }
 
-      var label = ns.truncateWithEllipsis(n.label.replace(/^https*:\/\/(www\.)*/gi, ''), options.label_max_length)
+      var label = ns.tuneLabelString(n.label, options)
 
       // Add to draw pipe
       var l = {
@@ -2690,9 +2690,7 @@ newRenderer = function(){
     }
 
     ns.log2("Precompute the paths of node labels...")
-
     options = options || {}
-
     var labelPaths = {}
     var g = ns.g
     var dim = ns.getRenderingPixelDimensions()
@@ -2776,7 +2774,7 @@ newRenderer = function(){
       var n = g.getNodeAttributes(nid)
       var nx = n.x
       var ny = n.y
-      var label = ns.truncateWithEllipsis(n.label.replace(/^https*:\/\/(www\.)*/gi, ''), options.label_max_length)
+      var label = ns.tuneLabelString(n.label, options)
 
       ctx.font = ns.buildLabelFontContext(options, n.size)
       
@@ -2878,13 +2876,19 @@ newRenderer = function(){
     return labelPaths
   }
 
+  ns.drawTextPath = function(ctx, path, label) {
+    let textPath_measureText = ns.getTextPathMeasureText(ctx)
+    let textPath_draw = ns.getTextPathDraw(ctx)
+    ns.textPath(label, path, textPath_measureText, textPath_draw, 'center');
+  }
+
   ns.getVisibleLabels = function(options) {
     // Cache
     if (ns._visibleLabels) {
       return ns._visibleLabels
     }
 
-    var labelPaths, textPath_measureText, textPath_draw
+    var labelPaths
     if (options.label_curved_path) {
       labelPaths = ns.getLabelPaths(options)
     }
@@ -2942,8 +2946,7 @@ newRenderer = function(){
 
         ctx.font = ns.buildLabelFontContext(options, n.size)
         var fontSize = +ctx.font.split('px')[0]
-
-        var label = ns.truncateWithEllipsis(n.label.replace(/^https*:\/\/(www\.)*/gi, ''), options.label_max_length)
+        var label = ns.tuneLabelString(n.label, options)
 
         // Create new empty canvas for the bounding area of that label
         var ctx2 = ns.createCanvas().getContext("2d")
@@ -3054,9 +3057,7 @@ newRenderer = function(){
             ctx.textAlign = 'center'
             
             if (options.label_curved_path) {
-              textPath_measureText = ns.getTextPathMeasureText(ctx)
-              textPath_draw = ns.getTextPathDraw(ctx)
-              ns.textPath(label, path, textPath_measureText, textPath_draw, 'center');
+              ns.drawTextPath(ctx, path, label)
             } else {
               ctx.fillText(
                 label,
@@ -3081,6 +3082,12 @@ newRenderer = function(){
     ns.report2("...done.")
     ns._visibleLabels = visibleLabels
     return visibleLabels
+  }
+
+  ns.tuneLabelString = function(label, options) {
+    options = options || {}
+    options.label_max_length = options.label_max_length || Infinity
+    return ns.truncateWithEllipsis(label.replace(/^https*:\/\/(www\.)*/gi, ''), options.label_max_length)
   }
 
   ns.truncateWithEllipsis = function(string, n) {
