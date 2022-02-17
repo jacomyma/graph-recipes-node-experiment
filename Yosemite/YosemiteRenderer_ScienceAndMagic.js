@@ -32,8 +32,8 @@ var settings = {}
 // Image size and resolution
 settings.image_width = 1000 // in mm. Default: 200mm (fits in a A4 page)
 settings.image_height = 500
-settings.output_dpi = 72 // Dots per inch.
-settings.rendering_dpi = 72 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
+settings.output_dpi = 300 // Dots per inch.
+settings.rendering_dpi = 300 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
 
 // Tiling:
 // Tiling allows to build images that would be otherwise too large.
@@ -62,7 +62,7 @@ settings.draw_cluster_labels = false
 settings.draw_edges = false
 settings.draw_nodes = false
 settings.draw_node_labels = true
-settings.draw_hillshading = false
+settings.draw_hillshading = true
 settings.draw_connected_closeness = false
 
 // Misc.
@@ -2252,293 +2252,11 @@ newRenderer = function(){
     options.label_path_center = false
     options.label_path_starting_angle_range = Math.PI/2 // From 0 (horizontal) to PI (any angle)
     options.label_path_step_angle_range = Math.PI/32 // From 0 (straight) to PI (any curvature)
-    // Monitoring options
-    options.label_draw_label = true // Default: true. Disable for monitoring only.
-    options.label_path_draw_path = false // Default: false. For monitoring only.
-    options.label_path_draw_anchor = false // Default: false. For monitoring only.    
-
+    
     var g = ns.g
     var dim = ns.getRenderingPixelDimensions()
     var ctx = ns.createCanvas().getContext("2d")
     ns.scaleContext(ctx)
-
-    // TODO: DELETE ME (after integrating stuff below)
-    if (false && options.label_curved_path) {
-      // Experiment HERE
-
-      // Prepare text path draw functions
-      var textPath_measureText = function(text) {
-        return ctx.measureText(text).width;
-      }
-      var textPath_draw = function(letter, x, y, angle) {
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(angle);
-        ctx.translate(0, 0.2 * ctx.font.split('px')[0]);
-        ctx.fillText(letter, 0, 0);
-        ctx.restore();
-      }
-
-
-      /// Unpack hillshading data
-      var shadingData = ns.getHillshadingData()
-      
-      // Unpack hillshading
-      var ratio = 1/shadingData.ratio
-      var lPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
-      var hPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
-      var dxPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
-      var dyPixelMap = new Float64Array(dim.w * dim.h * ns.settings.tile_factor * ns.settings.tile_factor)
-      var xu, yu, xp, xp1, xp2, dx, yp, yp1, yp2, dy, ip_top_left, ip_top_right, ip_bottom_left, ip_bottom_right
-      for (var i=0; i<lPixelMap.length; i++) {
-        // unpacked coordinates
-        xu = i%(dim.w * ns.settings.tile_factor)
-        yu = (i-xu)/(dim.w * ns.settings.tile_factor)
-        // packed coordinates
-        xp = xu/ratio
-        xp1 = Math.max(0, Math.min(shadingData.width, Math.floor(xp)))
-        xp2 = Math.max(0, Math.min(shadingData.width, Math.ceil(xp)))
-        dx = (xp-xp1)/(xp2-xp1) || 0
-        yp = yu/ratio
-        yp1 = Math.max(0, Math.min(shadingData.height, Math.floor(yp)))
-        yp2 = Math.max(0, Math.min(shadingData.height, Math.ceil(yp)))
-        dy = (yp-yp1)/(yp2-yp1) || 0
-        // coordinates of the 4 pixels necessary to rescale
-        ip_top_left = xp1 + (shadingData.width+1) * yp1
-        ip_top_right = xp2 + (shadingData.width+1) * yp1
-        ip_bottom_left = xp1 + (shadingData.width+1) * yp2
-        ip_bottom_right = xp2 + (shadingData.width+1) * yp2
-        // Rescaling (gradual blending between the 4 pixels)
-        lPixelMap[i] =
-            (1-dx) * (
-              (1-dy) * shadingData.lPixelMap[ip_top_left]
-              +  dy  * shadingData.lPixelMap[ip_bottom_left]
-            )
-          + dx * (
-              (1-dy) * shadingData.lPixelMap[ip_top_right]
-              +  dy  * shadingData.lPixelMap[ip_bottom_right]
-            )
-        hPixelMap[i] =
-            (1-dx) * (
-              (1-dy) * shadingData.hPixelMap[ip_top_left]
-              +  dy  * shadingData.hPixelMap[ip_bottom_left]
-            )
-          + dx * (
-              (1-dy) * shadingData.hPixelMap[ip_top_right]
-              +  dy  * shadingData.hPixelMap[ip_bottom_right]
-            )
-        dxPixelMap[i] =
-            (1-dx) * (
-              (1-dy) * shadingData.dxPixelMap[ip_top_left]
-              +  dy  * shadingData.dxPixelMap[ip_bottom_left]
-            )
-          + dx * (
-              (1-dy) * shadingData.dxPixelMap[ip_top_right]
-              +  dy  * shadingData.dxPixelMap[ip_bottom_right]
-            )
-        dyPixelMap[i] =
-            (1-dx) * (
-              (1-dy) * shadingData.dyPixelMap[ip_top_left]
-              +  dy  * shadingData.dyPixelMap[ip_bottom_left]
-            )
-          + dx * (
-              (1-dy) * shadingData.dyPixelMap[ip_top_right]
-              +  dy  * shadingData.dyPixelMap[ip_bottom_right]
-            )
-      }
-
-      // Compute scale for labels
-      var label_nodeSizeExtent = d3.extent(
-        g.nodes().map(function(nid){
-          return g.getNodeAttribute(nid, "size")
-        })
-      )
-      if (label_nodeSizeExtent[0] == label_nodeSizeExtent[1]) {label_nodeSizeExtent[0] *= 0.9}
-
-      // Compute each label's path
-      var step_length = ns.mm_to_px(options.label_path_step);
-      var labelPaths = {}
-      g.nodes().forEach(function(nid){
-        var n = g.getNodeAttributes(nid)
-        var nx = n.x
-        var ny = n.y
-        var label = ns.tuneLabelString(n.label, options)
-
-        var fontSize = ns.pt_to_pt( options.sized_labels
-          ? Math.floor(options.label_font_min_size + (n.size - label_nodeSizeExtent[0]) * (options.label_font_max_size - options.label_font_min_size) / (label_nodeSizeExtent[1] - label_nodeSizeExtent[0]))
-          : Math.floor(0.8 * options.label_font_min_size + 0.2 * options.label_font_max_size)
-        )
-        
-        // sw: Size and weight
-        var sw = normalizeFontSize(fontSize)
-        if (!options.true_size) {
-          fontSize = sw[0]
-        }
-        var fontWeight = sw[1]
-        ctx.font = ns.buildContextFontString(fontWeight, fontSize, options.label_font_family)
-        
-        // Let's get the label length
-        var labelLength = ctx.measureText(label).width
-
-        // For simplicity, the path always has a "central" segment
-        var angle
-        var path = []
-        var pathLength = 0
-        // Set the central segment
-        var i = Math.floor(nx) + Math.floor(ny)*dim.w*ns.settings.tile_factor
-        if (options.label_path_downhill) {
-          angle = Math.atan2(dyPixelMap[i], dxPixelMap[i])
-        } else {
-          angle = Math.atan2(dxPixelMap[i], -dyPixelMap[i])
-        }
-        // Note: angle is in [-PI, PI] at this stage
-        if (Math.PI/2 < angle && angle < Math.PI - options.label_path_starting_angle_range/2) {
-          angle = Math.PI - options.label_path_starting_angle_range/2
-        } else if (options.label_path_starting_angle_range/2 < angle && angle < Math.PI/2 ) {
-          angle = options.label_path_starting_angle_range/2
-        } else if (-Math.PI/2 < angle && angle < -options.label_path_starting_angle_range/2 ) {
-          angle = -options.label_path_starting_angle_range/2
-        } else if (-Math.PI + options.label_path_starting_angle_range/2 < angle && angle < -Math.PI/2 ) {
-          angle = -Math.PI + options.label_path_starting_angle_range/2
-        }
-
-        var initAngle = angle
-        var lastAngle = angle
-        path.push([nx - 0.5*step_length*Math.cos(angle), ny - 0.5*step_length*Math.sin(angle)])
-        path.push([nx + 0.5*step_length*Math.cos(angle), ny + 0.5*step_length*Math.sin(angle)])
-        pathLength += step_length
-        var point
-        
-        // Extend the path forward (to the right)
-        while (pathLength < ((options.label_path_center)?(labelLength/2):(labelLength))) {
-          point = path[path.length - 1]
-          i = Math.floor(point[0]) + Math.floor(point[1])*dim.w*ns.settings.tile_factor
-          if (options.label_path_downhill) {
-            angle = Math.atan2(dyPixelMap[i], dxPixelMap[i])
-          } else {
-            angle = Math.atan2(dxPixelMap[i], -dyPixelMap[i])
-          }
-          angleDiff = angle-lastAngle
-          while (angleDiff <= -Math.PI) {
-            angleDiff += 2*Math.PI
-          }
-          while (angleDiff > Math.PI) {
-            angleDiff -= 2*Math.PI
-          }
-          if (angleDiff > options.label_path_step_angle_range) {
-            angleDiff = options.label_path_step_angle_range
-          } else if (angleDiff < -options.label_path_step_angle_range) {
-            angleDiff = -options.label_path_step_angle_range
-          }
-          angle = lastAngle + angleDiff
-          path.push([point[0]+step_length*Math.cos(angle), point[1]+step_length*Math.sin(angle)])
-          lastAngle = angle
-          pathLength += step_length
-        }
-
-        if (options.label_path_center) {
-          lastAngle = initAngle
-          // Extend the path backwards (to the left)
-          while (pathLength < labelLength) {
-            point = path[0]
-            i = Math.floor(point[0]) + Math.floor(point[1])*dim.w*ns.settings.tile_factor
-            if (options.label_path_downhill) {
-              angle = Math.atan2(dyPixelMap[i], dxPixelMap[i])
-            } else {
-              angle = Math.atan2(dxPixelMap[i], -dyPixelMap[i])
-            }
-            angleDiff = angle-lastAngle
-            while (angleDiff <= -Math.PI) {
-              angleDiff += 2*Math.PI
-            }
-            while (angleDiff > Math.PI) {
-              angleDiff -= 2*Math.PI
-            }
-            if (angleDiff > options.label_path_step_angle_range) {
-              angleDiff = options.label_path_step_angle_range
-            } else if (angleDiff < -options.label_path_step_angle_range) {
-              angleDiff = -options.label_path_step_angle_range
-            }
-            angle = lastAngle + angleDiff
-            path.unshift([point[0]-step_length*Math.cos(angle), point[1]-step_length*Math.sin(angle)])
-            lastAngle = angle
-            pathLength += step_length
-          }
-        }
-        labelPaths[nid] = path
-      })
-
-      var labelsStack = []
-      var visibleLabels = g.nodes()
-      visibleLabels.forEach(nid => {
-        var n = g.getNodeAttributes(nid)
-        var nx = n.x
-        var ny = n.y
-        var label = ns.tuneLabelString(n.label, options)
-        var path = labelPaths[nid]
-        // Add to draw pipe
-        var l = {
-          label: label,
-          x: nx,
-          y: ny,
-          path: path,
-          font: ctx.font,
-          color: '#000'
-        }
-        labelsStack.push(l)
-      })
-
-      // Draw text
-      labelsStack.forEach(function(l){
-        
-        if (options.label_path_draw_anchor) {
-          // Draw dot
-          ctx.fillStyle = "#090";
-          ctx.beginPath();
-          ctx.arc(l.x, l.y, 3.5, 0, 2 * Math.PI);
-          ctx.fill();
-        }
-
-        if (options.label_path_draw_path) {
-          // Draw path
-          var x = l.path[0][0]
-          var y = l.path[0][1]
-          var x2, y2
-          for (let i=1; i<l.path.length; i++) {
-            x2 = l.path[i][0]
-            y2 = l.path[i][1]
-
-            ctx.lineCap = "round"
-            ctx.lineJoin = "round"
-            ctx.beginPath()
-            ctx.lineWidth = 2
-            ctx.strokeStyle = "#"+Math.floor(Math.random()*16777215).toString(16); //"#036";
-            ctx.moveTo(x, y)
-            ctx.lineTo(x2, y2)
-            ctx.stroke()
-
-            x = x2
-            y = y2
-          }
-        }
-
-        if (options.label_draw_label) {
-          // Draw label
-          ctx.font = l.font
-          ctx.lineWidth = 0
-          ctx.fillStyle = l.color.toString()
-          ctx.textAlign = 'center'
-                   
-          ns.textPath(l.label, l.path, textPath_measureText, textPath_draw, 'center');
-        }
-        
-      })
-
-      return ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
-
-    }
-
-
 
     var i, x, y
 
@@ -2549,6 +2267,7 @@ newRenderer = function(){
     // Draw labels
     var labelsStack = []
     var borderThickness = ns.mm_to_px(options.label_border_thickness)
+    var labelPaths = (options.label_curved_path)?(ns.getLabelPaths(options)):(false)
     visibleLabels.forEach(function(nid){
 
       var n = g.getNodeAttributes(nid)
@@ -2585,6 +2304,7 @@ newRenderer = function(){
         label: label,
         x: labelCoordinates.x,
         y: labelCoordinates.y,
+        path: ((options.label_curved_path)?(labelPaths[nid]):(false)),
         font: ctx.font,
         color: color
       }
@@ -2602,16 +2322,20 @@ newRenderer = function(){
       ctx.fillStyle = options.label_border_color
       ctx.strokeStyle = options.label_border_color
 
-      ctx.fillText(
-        l.label
-      , l.x
-      , l.y
-      )
-      ctx.strokeText(
-        l.label
-      , l.x
-      , l.y
-      )
+      if (options.label_curved_path) {
+        ns.drawTextPath(ctx, l.path, l.label, true)
+      } else {
+        ctx.fillText(
+          l.label
+        , l.x
+        , l.y
+        )
+        ctx.strokeText(
+          l.label
+        , l.x
+        , l.y
+        )
+      }
     })
 
     // Draw text
@@ -2619,11 +2343,15 @@ newRenderer = function(){
       ctx.font = l.font
       ctx.lineWidth = 0
       ctx.fillStyle = l.color.toString()
-      ctx.fillText(
-        l.label
-      , l.x
-      , l.y
-      )
+      if (options.label_curved_path) {
+        ns.drawTextPath(ctx, l.path, l.label)
+      } else {
+        ctx.fillText(
+          l.label
+        , l.x
+        , l.y
+        )
+      }
     })
 
     ns.report("...done.")
@@ -2672,14 +2400,26 @@ newRenderer = function(){
     }
   }
 
-  ns.getTextPathDraw = function(ctx) {
-    return function(letter, x, y, angle) {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(angle);
-      ctx.translate(0, 0.2 * ctx.font.split('px')[0]);
-      ctx.fillText(letter, 0, 0);
-      ctx.restore();
+  ns.getTextPathDraw = function(ctx, useBorder) {
+    if (useBorder) {
+      return function(letter, x, y, angle) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.translate(0, 0.2 * ctx.font.split('px')[0]);
+        ctx.fillText(letter, 0, 0);
+        ctx.strokeText(letter, 0, 0);
+        ctx.restore();
+      }
+    } else {
+      return function(letter, x, y, angle) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.translate(0, 0.2 * ctx.font.split('px')[0]);
+        ctx.fillText(letter, 0, 0);
+        ctx.restore();
+      }
     }
   }
 
@@ -2876,9 +2616,9 @@ newRenderer = function(){
     return labelPaths
   }
 
-  ns.drawTextPath = function(ctx, path, label) {
+  ns.drawTextPath = function(ctx, path, label, useBorder) {
     let textPath_measureText = ns.getTextPathMeasureText(ctx)
-    let textPath_draw = ns.getTextPathDraw(ctx)
+    let textPath_draw = ns.getTextPathDraw(ctx, useBorder)
     ns.textPath(label, path, textPath_measureText, textPath_draw, 'center');
   }
 
@@ -2888,22 +2628,17 @@ newRenderer = function(){
       return ns._visibleLabels
     }
 
-    var labelPaths
-    if (options.label_curved_path) {
-      labelPaths = ns.getLabelPaths(options)
-    }
-
-    ns.log2("Precompute visible node labels...")
-
     options = options || {}
     options.pixmap_max_resolution = options.pixmap_max_resolution || 10000000 // 10 megapixel
     // For monitoring
     options.download_image = false // For monitoring the process
 
-    var i, x, y, visibleLabels = []
+    ns.log2("Precompute visible node labels...")
 
+    var i, x, y, visibleLabels = []
     var dim = ns.getRenderingPixelDimensions()
     var g = ns.g
+    var labelPaths = ((options.label_curved_path)?(ns.getLabelPaths(options)):(false))
 
     // Reverse nodes by size order
     var nodesBySize = ns.getNodesBySize().slice(0)
@@ -2937,12 +2672,12 @@ newRenderer = function(){
     var labelDrawCount = options.label_count
     var offset = ns.mm_to_px(options.label_spacing_offset)
     var count = 0
-    nodesBySize.forEach(function(nid){
+    nodesBySize
+    .forEach(function(nid){
       if (labelDrawCount > 0) {
         var n = g.getNodeAttributes(nid)
         var nx = n.x
         var ny = n.y
-        var path = labelPaths[nid]
 
         ctx.font = ns.buildLabelFontContext(options, n.size)
         var fontSize = +ctx.font.split('px')[0]
@@ -2961,15 +2696,27 @@ newRenderer = function(){
         ctx2.closePath()
 
         // Draw the bounding area on that canvas
+        var path
+        if (options.label_curved_path) {
+          path = labelPaths[nid]
+        } else {
+          // Here the path is basically just the dimensions of the label
+          var measure = ctx.measureText(label)
+          // Assuming centered label
+          path = [
+            [nx - measure.width/2, ny - 0.25*fontSize],
+            [nx + measure.width/2, ny - 0.25*fontSize]
+          ]
+        }
         var margin = (fontSize * options.label_spacing_factor - fontSize)/2 + offset
         var lineWidth = fontSize + 2*margin
         ctx2.strokeStyle = '#FFF'
         ctx2.lineCap = 'round';
         ctx2.lineJoin = 'round';
-        ctx2.lineWidth = pathxmin;
-        var pathxmin = width
+        ctx2.lineWidth = lineWidth;
+        var pathxmin = dim.w
         var pathxmax = 0
-        var pathymin = height
+        var pathymin = dim.h
         var pathymax = 0
         ctx2.beginPath()
         var x, y
@@ -2999,17 +2746,22 @@ newRenderer = function(){
 
         // Test bounding box collision
         var collision = false
-        // var imgd = ctx2.getImageData(0, 0, width, height).data
         var box = {
-          x: Math.max(0, Math.floor(pathxmin-lineWidth/2)),
-          y: Math.max(0, Math.floor(pathymin-lineWidth/2)),
-          w: Math.min(width, Math.ceil(pathxmax+lineWidth/2)-Math.floor(pathxmin-lineWidth/2)),
-          h: Math.min(height, Math.ceil(pathymax+lineWidth/2)-Math.floor(pathymin-lineWidth/2))
+          x: Math.max(0, pathxmin-lineWidth/2),
+          y: Math.max(0, pathymin-lineWidth/2),
+          w: Math.min(width , pathxmax-pathxmin + lineWidth),
+          h: Math.min(height, pathymax-pathymin + lineWidth)
         }
         if (!isNaN(box.w) && !isNaN(box.h) && box.w>0 && box.h>0) {
-          var imgd = ctx2.getImageData(box.x, box.y, box.w, box.h).data
-          for (let i = 0; i < imgd.length; i += 4) {
-            if (imgd[i] > 0) {
+          var imgd = ctx2.getImageData(
+            Math.floor(ratio*box.x),
+            Math.floor(ratio*box.y),
+            Math.ceil(ratio*box.w),
+            Math.ceil(ratio*box.h)
+          )
+          var data = imgd.data
+          for (let i = 0; i < data.length; i += 4) {
+            if (data[i] > 0) {
               collision = true
               break
             }
@@ -3046,7 +2798,7 @@ newRenderer = function(){
           if (options.download_image) {
             // Draw bounding area rectangle
             ctx.beginPath();
-            ctx.lineWidth = .5;
+            ctx.lineWidth = 1;
             ctx.strokeStyle = '#0FF';
             ctx.rect(box.x, box.y, box.w, box.h)
             ctx.stroke();
@@ -3061,8 +2813,8 @@ newRenderer = function(){
             } else {
               ctx.fillText(
                 label,
-                labelCoordinates.x,
-                labelCoordinates.y
+                nx,
+                ny
               )
             }
           }
