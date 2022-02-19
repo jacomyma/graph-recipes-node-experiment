@@ -32,8 +32,8 @@ var settings = {}
 // Image size and resolution
 settings.image_width = 200 // in mm. Default: 200mm (fits in a A4 page)
 settings.image_height = 200
-settings.output_dpi = 300 // Dots per inch.
-settings.rendering_dpi = 300 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
+settings.output_dpi = 72 // Dots per inch.
+settings.rendering_dpi = 72 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
 
 // Tiling:
 // Tiling allows to build images that would be otherwise too large.
@@ -56,13 +56,13 @@ settings.margin_left   =  6 // in mm
 settings.draw_background = true
 settings.draw_network_shape_fill = false
 settings.draw_network_shape_contour = false
-settings.draw_cluster_fills = true
-settings.draw_cluster_contours = true
-settings.draw_cluster_labels = true
+settings.draw_cluster_fills = false
+settings.draw_cluster_contours = false
+settings.draw_cluster_labels = false
 settings.draw_edges = true
 settings.draw_nodes = true
-settings.draw_node_labels = true
-settings.draw_connected_closeness = true
+settings.draw_node_labels = false
+settings.draw_connected_closeness = false
 
 // Layer: Background
 settings.background_color = "#ffffff"
@@ -118,7 +118,7 @@ settings.cluster_label_inner_color = "#ffffff" // Note: here color is on the bor
 // Layer: Edges
 settings.edge_alpha = 1 // Opacity // Range from 0 to 1
 settings.edge_curved = true
-settings.edge_high_quality = true // Halo around nodes // Time-consuming
+settings.edge_high_quality = false // Halo around nodes // Time-consuming
 settings.edge_color = "#b6b8c4"
 
 // Layer: Nodes
@@ -1886,6 +1886,13 @@ newRenderer = function(){
     options.display_voronoi = false // for monitoring purpose
     options.display_edges = true // disable for monitoring purpose
 
+    // DELETEME
+    options.max_edge_count = 1
+    options.edge_thickness = .5
+    options.edge_color = "#600"
+    options.edge_curved = false
+    options.edge_bundled = true
+
     var g = ns.g
     var dim = ns.getRenderingPixelDimensions()
     var ctx = ns.createCanvas().getContext("2d")
@@ -1980,6 +1987,89 @@ newRenderer = function(){
       let vImgd = new ImageData(vData, dim.w, dim.h)
       ctx.putImageData(vImgd,0, 0)
       ns.report2("...done.")
+    }
+
+    if (options.edge_bundled) {
+      // EXPERIMENTATION ZONE
+
+      // Sort edges by length
+      g.edges().forEach(eid => {
+        let e = g.getEdgeAttributes(eid)
+        let nsid = g.source(eid)
+        let ntid = g.target(eid)
+        e.l2 = Math.pow(g.getNodeAttribute(nsid, 'x')-g.getNodeAttribute(ntid, 'x'),2)
+          + Math.pow(g.getNodeAttribute(nsid, 'y')-g.getNodeAttribute(ntid, 'y'),2)
+      })
+      var sortedEdges = g.edges().slice(0)
+      sortedEdges.sort((eaid, ebid) => g.getEdgeAttribute(ebid,'l2')-g.getEdgeAttribute(eaid,'l2'))
+
+      // Draw edges
+      var color = d3.color(options.edge_color)
+      var thickness = ns.mm_to_px(options.edge_thickness)
+      var jitter = ns.mm_to_px(options.edge_path_jitter)
+      var tf = ns.settings.tile_factor
+      ctx.lineCap="round"
+      ctx.lineJoin="round"
+      ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+
+      sortedEdges
+        .filter(function(eid, i_){ return i_ < options.max_edge_count })
+        .forEach(function(eid, i_){
+          var n_s = g.getNodeAttributes(g.source(eid))
+          var n_t = g.getNodeAttributes(g.target(eid))
+          var path, i, x, y, o, dpixi, lastdpixi, lasto, pixi, pi
+
+          // Build path
+          var d = Math.sqrt(Math.pow(n_s.x - n_t.x, 2) + Math.pow(n_s.y - n_t.y, 2))
+          var angle = Math.atan2( n_t.y - n_s.y, n_t.x - n_s.x )
+          var iPixStep = ns.mm_to_px(options.edge_path_segment_length)
+          var segCount = Math.ceil(d/iPixStep)
+          pi = 0
+          path = new Int32Array(3*segCount)
+
+          for (i=0; i<1; i+=iPixStep/d) {
+            x = (1-i)*n_s.x + i*n_t.x
+            y = (1-i)*n_s.y + i*n_t.y
+
+            path[pi  ] = x*tf
+            path[pi+1] = y*tf
+            path[pi+2] = 255
+            pi +=3
+          }
+
+          path[3*(segCount-1)  ] = n_t.x*tf
+          path[3*(segCount-1)+1] = n_t.y*tf
+          path[3*(segCount-1)+2] = 255
+
+          // Draw path
+          var x, y, o, lastx, lasty, lasto
+          for (i=0; i<path.length; i+=3) {
+            x = Math.floor( 1000 * (path[i]/tf + jitter * (0.5 - Math.random())) ) / 1000
+            y = Math.floor( 1000 * (path[i+1]/tf + jitter * (0.5 - Math.random())) ) / 1000
+            o = path[i+2]/255
+
+            if (lastx) {
+              ctx.lineWidth = thickness * (0.9 + 0.2*Math.random())
+              color.opacity = (lasto+o)/2
+              ctx.beginPath()
+              ctx.strokeStyle = color.toString()
+              ctx.moveTo(lastx, lasty)
+              ctx.lineTo(x, y)
+              ctx.stroke()
+              ctx.closePath()
+            }
+
+            lastx = x
+            lasty = y
+            lasto = o
+          }
+        })
+
+      ns.report("...done.")
+      return ns.multiplyAlpha(
+        ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height),
+        options.edge_alpha
+      )
     }
 
     // Draw each edge
