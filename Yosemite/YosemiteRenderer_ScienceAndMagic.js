@@ -2631,7 +2631,7 @@ newRenderer = function(){
     }
 
     options = options || {}
-    options.pixmap_max_resolution = options.pixmap_max_resolution || 10000000 // 10 megapixel
+    options.label_collision_pixmap_max_resolution = options.label_collision_pixmap_max_resolution || 10000000 // 10 megapixel
     // For monitoring
     options.download_image = false // For monitoring the process
 
@@ -2648,8 +2648,8 @@ newRenderer = function(){
 
     // Ratio
     var ratio, width, height
-    if (dim.w*dim.h>options.pixmap_max_resolution) {
-      ratio = Math.sqrt(options.pixmap_max_resolution/(dim.w*dim.h))
+    if (dim.w*dim.h>options.label_collision_pixmap_max_resolution) {
+      ratio = Math.sqrt(options.label_collision_pixmap_max_resolution/(dim.w*dim.h))
       width = Math.floor(ratio*dim.w)
       height = Math.floor(ratio*dim.h)
     } else {
