@@ -32,8 +32,8 @@ var settings = {}
 // Image size and resolution
 settings.image_width = 1000 // in mm. Default: 200mm (fits in a A4 page)
 settings.image_height = 800
-settings.output_dpi = 600 // Dots per inch.
-settings.rendering_dpi = 600 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
+settings.output_dpi = 72 // Dots per inch.
+settings.rendering_dpi = 72 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
 
 // Tiling:
 // Tiling allows to build images that would be otherwise too large.
@@ -61,8 +61,9 @@ settings.draw_cluster_fills = false
 settings.draw_cluster_contours = false
 settings.draw_cluster_labels = false
 settings.draw_edges = false
+settings.draw_node_shadows = true
 settings.draw_nodes = true
-settings.draw_node_labels = true
+settings.draw_node_labels = false
 settings.draw_connected_closeness = false
 
 // Layer: Background
@@ -124,13 +125,15 @@ settings.edge_curved = true
 settings.edge_high_quality = true // Halo around nodes // Time-consuming
 settings.edge_color = "#715035"
 
+// Layer: Node shadows
+settings.node_color_shadow = true
+settings.node_color_shadow_offset = 1.8 // mm
+settings.node_color_shadow_blur_radius = 8 // mm
+settings.node_color_shadow_opacity = .6
+
 // Layer: Nodes
 settings.adjust_voronoi_range = 100 // Factor // Larger node halo
 settings.node_size = 1. // Factor to adjust the nodes drawing size
-settings.node_color_shadow = true
-settings.node_color_shadow_offset = 1.2 // mm
-settings.node_color_shadow_blur_radius = 2.4 // mm
-settings.node_color_shadow_opacity = 1
 settings.node_color_original = false // Use the original node color
 settings.node_color_by_modalities = true // Use the modalities to color nodes (using settings.node_clusters)
 settings.node_stroke_width = 0.01 // mm
@@ -140,12 +143,12 @@ settings.node_fill_color = "#283535"
 // Layer: Node labels
 settings.label_color = "#283535"
 settings.label_color_from_node = true
-settings.label_count = 250
+settings.label_count = Infinity
 settings.label_max_length = 42 // Number of characters before truncate. Infinity is a valid value.
 settings.label_font_family = "Raleway"
 settings.label_font_min_size = 4 // in pt
-settings.label_font_max_size = 10  // in pt
-settings.label_font_thickness = .15
+settings.label_font_max_size = 14  // in pt
+settings.label_font_thickness = .18
 settings.label_border_thickness = .8 // in mm
 settings.label_spacing_offset = 1.5 // in mm (prevents label overlap)
 settings.label_border_color = "#FFFFFF"
@@ -245,10 +248,10 @@ settings.node_clusters = {
 }
 
 // Advanced settings
-settings.voronoi_range = 0.6 // Halo size in mm
+settings.voronoi_range = 1.2 // Halo size in mm
 settings.voronoi_resolution_max = 1 * Math.pow(10, 7) // in pixel. 10^7 still quick, 10^8 better quality 
 settings.heatmap_resolution_max = 1 * Math.pow(10, 5) // in pixel. 10^5 quick. 10^7 nice but super slow.
-settings.heatmap_spreading = 3 // in mm
+settings.heatmap_spreading = 5 // in mm
 
 // Experimental stuff
 settings.hillshading_strength = 30
@@ -318,6 +321,14 @@ newRenderer = function(){
     if (ns.settings.draw_network_shape_contour) {
       bgImage = ns.drawLayerOnTop(layeredImage,
         ns.drawNetworkShapeContourLayer(ns.settings)
+      )
+    }
+
+    // Draw node shadows
+    if (ns.settings.draw_node_shadows) {
+      layeredImage = ns.overlayLayer(layeredImage,
+        ns.drawNodesShadowLayer(ns.settings),
+        "multiply"
       )
     }
     
@@ -2934,6 +2945,74 @@ newRenderer = function(){
     }
   }
 
+  ns.drawNodesShadowLayer = function(options) {
+    ns.log("Draw node shadows...")
+
+    options = options || {}
+    options.node_size = options.node_size || 1
+    options.node_color_original = (options.node_color_original===undefined)?(false):(options.node_color_original)
+    options.node_color_by_modalities = (options.node_color_by_modalities===undefined)?(false):(options.node_color_by_modalities)
+    options.node_color_shadow_opacity = (options.node_color_shadow_opacity===undefined)?(.5):(options.node_color_shadow_opacity)
+    options.node_color_shadow_offset = (options.node_color_shadow_offset===undefined)?(3):(options.node_color_shadow_offset) // In mm
+    options.node_color_shadow_ratio = (options.node_color_shadow_ratio===undefined)?(1.5):(options.node_color_shadow_ratio)
+    options.node_color_shadow_blur_radius = 2.4 // in mm
+    options.node_fill_color = options.node_fill_color || "#FFF"
+
+    var g = ns.g
+    var ctx = ns.createCanvas().getContext("2d")
+    ns.scaleContext(ctx)
+    ns.paintAll(ctx, "#FFFFFF")
+
+    // Shadows
+    ctx.lineCap="round"
+    ctx.lineJoin="round"
+    var radiusRatioMax = options.node_color_shadow_ratio
+    var radiusRatio = radiusRatioMax
+    var radiusOffsetMax = ns.mm_to_px(options.node_color_shadow_offset)
+    var radiusOffset = radiusOffsetMax
+    var steps = 64
+    ctx.shadowColor = 'transparent'
+    ctx.lineWidth = 0
+    while (steps--> 0) {
+      radiusRatio -= (radiusRatioMax-1)/steps
+      radiusOffset -= radiusOffsetMax/steps
+      ns.getNodesBySize().forEach(function(nid){
+        var n = g.getNodeAttributes(nid)
+        var color = d3.color(ns.getNodeColor(options, n))
+
+        // Tune the color to be a bit more vivid, a bit less dark
+        var hsl = d3.hsl(color)
+        hsl.l = Math.min(1, hsl.l * 1.2)
+        hsl.s = Math.min(1, hsl.s * 1.1)
+        
+        color = d3.color(hsl)
+        color.opacity = 1/32
+
+        var radius = radiusRatio * options.node_size * n.size + radiusOffset
+
+        ctx.beginPath()
+        ctx.arc(n.x, n.y, radius, 0, 2 * Math.PI, false)
+        ctx.fillStyle = color.toString()
+        ctx.fill()
+
+      })
+    }
+
+    // Blur
+    var blurRadius = ns.mm_to_px(options.node_color_shadow_blur_radius) * ns.settings.tile_factor
+    var imgd = ns.blur(ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height), blurRadius, ctx)
+    
+    var data = imgd.data;
+    for (let i = 3; i < data.length; i += 4) {
+      data[i] = Math.floor(options.node_color_shadow_opacity*data[i])
+    }
+
+    ctx.putImageData(imgd,0, 0)
+
+    ns.report("...done.")
+    return ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
+  }
+
   ns.drawNodesLayer = function(options) {
     ns.log("Draw nodes...")
 
@@ -2943,11 +3022,6 @@ newRenderer = function(){
     options.node_stroke_width = options.node_stroke_width || 0.08 // in mm
     options.node_color_original = (options.node_color_original===undefined)?(false):(options.node_color_original)
     options.node_color_by_modalities = (options.node_color_by_modalities===undefined)?(false):(options.node_color_by_modalities)
-    options.node_color_shadow = (options.node_color_shadow===undefined)?(false):(options.node_color_shadow)
-    options.node_color_shadow_opacity = (options.node_color_shadow_opacity===undefined)?(.5):(options.node_color_shadow_opacity)
-    options.node_color_shadow_offset = (options.node_color_shadow_offset===undefined)?(3):(options.node_color_shadow_offset) // In mm
-    options.node_color_shadow_ratio = (options.node_color_shadow_ratio===undefined)?(1.5):(options.node_color_shadow_ratio)
-    options.node_color_shadow_blur_radius = 2.4 // in mm
     options.node_fill_color = options.node_fill_color || "#FFF"
     options.node_stroke_color = options.node_stroke_color || "#303040"
 
@@ -2955,52 +3029,7 @@ newRenderer = function(){
     var ctx = ns.createCanvas().getContext("2d")
     ns.scaleContext(ctx)
 
-    // Shadows
-    if (options.node_color_shadow) {
-      
-      ns.log2("Draw Nodes shadow...")
-      ctx.lineCap="round"
-      ctx.lineJoin="round"
-      var radiusRatioMax = options.node_color_shadow_ratio
-      var radiusRatio = radiusRatioMax
-      var radiusOffsetMax = ns.mm_to_px(options.node_color_shadow_offset)
-      var radiusOffset = radiusOffsetMax
-      var steps = 64
-      ctx.shadowColor = 'transparent'
-      ctx.lineWidth = 0
-      while (steps--> 0) {
-        radiusRatio -= (radiusRatioMax-1)/steps
-        radiusOffset -= radiusOffsetMax/steps
-        ns.getNodesBySize().forEach(function(nid){
-          var n = g.getNodeAttributes(nid)
-          var color = d3.color(ns.getNodeColor(options, n))
-          color.opacity = 1/32
-          var radius = radiusRatio * options.node_size * n.size + radiusOffset
-
-          ctx.beginPath()
-          ctx.arc(n.x, n.y, radius, 0, 2 * Math.PI, false)
-          ctx.fillStyle = color.toString()
-          ctx.fill()
-
-        })
-      }
-
-      // Blur
-      var blurRadius = ns.mm_to_px(options.node_color_shadow_blur_radius) * ns.settings.tile_factor
-      var imgd = ns.blur(ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height), blurRadius, ctx)
-      
-      var data = imgd.data;
-      for (let i = 3; i < data.length; i += 4) {
-        data[i] = Math.floor(options.node_color_shadow_opacity*data[i])
-      }
-
-      ctx.putImageData(imgd,0, 0)
-
-      ns.report2("...done.")
-    }
-
     // Node dots
-
     var stroke_width = ns.mm_to_px(options.node_stroke_width)
 
     ns.getNodesBySize().forEach(function(nid){
