@@ -8,8 +8,8 @@ const d3 = require('d3')
 // Read file
 var gexf_string;
 try {
-    // gexf_string = fs.readFileSync('data/08 with topic scores.gexf', 'utf8');
-    gexf_string = fs.readFileSync('data/test.gexf', 'utf8');
+    gexf_string = fs.readFileSync('data/08 with topic scores.gexf', 'utf8');
+    // gexf_string = fs.readFileSync('data/test.gexf', 'utf8');
     console.log('GEXF file loaded');    
 } catch(e) {
     console.log('Error:', e.stack);
@@ -33,14 +33,14 @@ var settings = {}
 // Image size and resolution
 settings.image_width = 1000 // in mm. Default: 200mm (fits in a A4 page)
 settings.image_height = 800
-settings.output_dpi = 72 // Dots per inch.
-settings.rendering_dpi = 72 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
+settings.output_dpi = 600 // Dots per inch.
+settings.rendering_dpi = 600 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
 
 // Tiling:
 // Tiling allows to build images that would be otherwise too large.
 // You will have to assemble them by yourself.
 settings.tile_factor = 3 // Integer, default 1. Number of rows and columns of the grid of exported images.
-settings.tile_to_render = [0, 1] // Grid coordinates, as integers
+settings.tile_to_render = [0, 0] // Grid coordinates, as integers
 
 // Orientation & layout:
 settings.flip_x = false
@@ -64,7 +64,7 @@ settings.draw_cluster_labels        = false
 settings.draw_edges                 = false
 settings.draw_node_shadows          = true
 settings.draw_nodes                 = true
-settings.draw_node_labels           = false
+settings.draw_node_labels           = true
 settings.draw_connected_closeness   = false
 
 // Layer: Background
@@ -1986,6 +1986,8 @@ newRenderer = function(){
     // For monitoring only
     options.label_path_monitor_field = false
     options.label_path_monitor = false
+    options.node_size = (options.node_size===undefined)?(1):(options.node_size)
+    options.label_node_space_ratio = 0.05 // ratio of node size
 
     // Cache
     if (ns._labelPaths) {
@@ -2128,6 +2130,8 @@ newRenderer = function(){
       var n = g.getNodeAttributes(nid)
       var nx = n.x
       var ny = n.y
+      var nodeSize = options.node_size * n.size
+      var labelOffset = nodeSize * (1+options.label_node_space_ratio)
 
       if (options.label_path_monitor) {
         ctx.fillStyle = "#FFFFFF"
@@ -2173,7 +2177,7 @@ newRenderer = function(){
       var point
       
       // Extend the path forward (to the right)
-      while (pathLength < ((options.label_path_center)?(labelLength/2):(labelLength))) {
+      while (pathLength < ((options.label_path_center)?(labelLength/2):(labelLength+labelOffset))) {
         point = path[path.length - 1]
         i = Math.floor(point[0]*settings.tile_factor) + Math.floor(point[1]*settings.tile_factor)*dim.w*ns.settings.tile_factor
         originalAngle = Math.atan2(dyPixelMap[i], dxPixelMap[i])
@@ -2228,6 +2232,12 @@ newRenderer = function(){
           path.unshift([point[0]-step_length*Math.cos(angle), point[1]-step_length*Math.sin(angle), originalAngle])
           lastAngle = angle
           pathLength += step_length
+        }
+      } else {
+        // We need to remove the some length at the beginning where it overlaps the node
+        while (pathLength>=labelLength) {
+          path.shift()
+          pathLength -= step_length
         }
       }
       labelPaths[nid] = path
@@ -3743,5 +3753,5 @@ newRenderer = function(){
 
 /// FINALLY, RENDER
 let renderer = newRenderer()
-renderer.renderAndSave(g, settings)
-// renderer.renderAndSaveAllTiles(g, settings)
+// renderer.renderAndSave(g, settings)
+renderer.renderAndSaveAllTiles(g, settings)
