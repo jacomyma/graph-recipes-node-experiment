@@ -2274,7 +2274,11 @@ newRenderer = function(){
   ns.drawTextPath = function(ctx, path, label, useBorder) {
     let textPath_measureText = ns.getTextPathMeasureText(ctx)
     let textPath_draw = ns.getTextPathDraw(ctx, useBorder)
-    ns.textPath(label, path, textPath_measureText, textPath_draw, 'center');
+    try {
+      ns.textPath(label, path, textPath_measureText, textPath_draw, 'center');
+    } catch(e) {
+      console.warn('Text path could not be drawn for label "'+label+'"')
+    }
   }
 
   ns.getVisibleLabels = function(options) {
@@ -2363,67 +2367,72 @@ newRenderer = function(){
             [nx + measure.width/2, ny - 0.25*fontSize]
           ]
         }
-        var margin = (fontSize * options.label_spacing_factor - fontSize)/2 + offset
-        var lineWidth = fontSize + 2*margin
-        ctx2.strokeStyle = '#FFF'
-        ctx2.lineCap = 'round';
-        ctx2.lineJoin = 'round';
-        ctx2.lineWidth = lineWidth;
-        var pathxmin = dim.w
-        var pathxmax = 0
-        var pathymin = dim.h
-        var pathymax = 0
-        ctx2.beginPath()
-        var x, y
-        x = path[0][0]
-        y = path[0][1]
-        ctx2.moveTo(x, y)
-        pathxmin = Math.min(pathxmin, x)
-        pathxmax = Math.max(pathxmax, x)
-        pathymin = Math.min(pathymin, y)
-        pathymax = Math.max(pathymax, y)
-        for (let pi=1; pi<path.length; pi++){
-          x = path[pi][0]
-          y = path[pi][1]
-          ctx2.lineTo(x, y)
+        if (path.length > 0) {
+          var margin = (fontSize * options.label_spacing_factor - fontSize)/2 + offset
+          var lineWidth = fontSize + 2*margin
+          ctx2.strokeStyle = '#FFF'
+          ctx2.lineCap = 'round';
+          ctx2.lineJoin = 'round';
+          ctx2.lineWidth = lineWidth;
+          var pathxmin = dim.w
+          var pathxmax = 0
+          var pathymin = dim.h
+          var pathymax = 0
+          ctx2.beginPath()
+          var x, y
+          x = path[0][0]
+          y = path[0][1]
+          ctx2.moveTo(x, y)
           pathxmin = Math.min(pathxmin, x)
           pathxmax = Math.max(pathxmax, x)
           pathymin = Math.min(pathymin, y)
           pathymax = Math.max(pathymax, y)
-        }
-        ctx2.stroke()
+          for (let pi=1; pi<path.length; pi++){
+            x = path[pi][0]
+            y = path[pi][1]
+            ctx2.lineTo(x, y)
+            pathxmin = Math.min(pathxmin, x)
+            pathxmax = Math.max(pathxmax, x)
+            pathymin = Math.min(pathymin, y)
+            pathymax = Math.max(pathymax, y)
+          }
+          ctx2.stroke()
 
-        // Merge with the other canvas
-        ctx2.globalCompositeOperation = "multiply"
-        ctx2.setTransform(1, 0, 0, 1, 0, 0);
-        ctx2.drawImage(ctx.canvas, 0, 0)
-        ctx2.scale(ratio, ratio)
-
-        // Test bounding box collision
-        var collision = false
-        var box = {
-          x: Math.max(0, pathxmin-lineWidth/2),
-          y: Math.max(0, pathymin-lineWidth/2),
-          w: Math.min(width , pathxmax-pathxmin + lineWidth),
-          h: Math.min(height, pathymax-pathymin + lineWidth)
-        }
-        if (!isNaN(box.w) && !isNaN(box.h) && box.w>0 && box.h>0) {
-          var imgd = ctx2.getImageData(
-            Math.floor(ratio*box.x),
-            Math.floor(ratio*box.y),
-            Math.ceil(ratio*box.w),
-            Math.ceil(ratio*box.h)
-          )
-          var data = imgd.data
-          for (let i = 0; i < data.length; i += 4) {
-            if (data[i] > 0) {
-              collision = true
-              break
+          // Merge with the other canvas
+          ctx2.globalCompositeOperation = "multiply"
+          ctx2.setTransform(1, 0, 0, 1, 0, 0);
+          ctx2.drawImage(ctx.canvas, 0, 0)
+          ctx2.scale(ratio, ratio)
+  
+          // Test bounding box collision
+          var collision = false
+          var box = {
+            x: Math.max(0, pathxmin-lineWidth/2),
+            y: Math.max(0, pathymin-lineWidth/2),
+            w: Math.min(width , pathxmax-pathxmin + lineWidth),
+            h: Math.min(height, pathymax-pathymin + lineWidth)
+          }
+          if (!isNaN(box.w) && !isNaN(box.h) && box.w>0 && box.h>0) {
+            var imgd = ctx2.getImageData(
+              Math.floor(ratio*box.x),
+              Math.floor(ratio*box.y),
+              Math.ceil(ratio*box.w),
+              Math.ceil(ratio*box.h)
+            )
+            var data = imgd.data
+            for (let i = 0; i < data.length; i += 4) {
+              if (data[i] > 0) {
+                collision = true
+                break
+              }
             }
+          } else {
+            collision = true
+            console.log("Warning: path issue for "+nid+" ("+label+"):", box)
           }
         } else {
           collision = true
-          console.log("Warning: path issue for "+nid+" ("+label+"):", box)
+          console.log("Warning: path of length 0 for "+nid+" ("+label+"):")
         }
 
         if (!collision) {
@@ -2545,7 +2554,99 @@ newRenderer = function(){
 
   // TextPath
   // From https://www.npmjs.com/package/textpath
-  ns.textPath=function(t){function r(a){if(e[a])return e[a].exports;var n=e[a]={i:a,l:!1,exports:{}};return t[a].call(n.exports,n,n.exports,r),n.l=!0,n.exports}var e={};return r.m=t,r.c=e,r.d=function(t,e,a){r.o(t,e)||Object.defineProperty(t,e,{configurable:!1,enumerable:!0,get:a})},r.n=function(t){var e=t&&t.__esModule?function(){return t.default}:function(){return t};return r.d(e,"a",e),e},r.o=function(t,r){return Object.prototype.hasOwnProperty.call(t,r)},r.p="",r(r.s=0)}([function(t,r,e){"use strict";function a(t,r,e,a,n){for(var o=0,u=r[0],f=1,h=r.length;f<h;++f){var l=r[f];o+=Math.sqrt(Math.pow(l[0]-u[0],2)+Math.pow(l[1]-u[1],2)),u=l}var p=e(t),c="left"==n?0:"right"==n?1:.5,i=(o-p)*c,s=0,M=r.length,v=r[s][0]>r[M-1][0],d=t.length,w=r[s][0],x=r[s][1];s+=1;for(var g,P=r[s][0],b=r[s][1],y=0,O=Math.sqrt(Math.pow(P-w,2)+Math.pow(b-x,2)),f=0;f<d;++f){g=v?d-f-1:f;for(var _=t[g],j=e(_),q=i+j/2;s<M-1&&y+O<q;)w=P,x=b,s+=1,P=r[s][0],b=r[s][1],y+=O,O=Math.sqrt(Math.pow(P-w,2)+Math.pow(b-x,2));var m=q-y,I=Math.atan2(b-x,P-w);v&&(I+=I>0?-Math.PI:Math.PI);var k=m/O;a(_,w+k*(P-w),x+k*(b-x),I),i+=j}}Object.defineProperty(r,"__esModule",{value:!0}),r.default=a,t.exports=r.default}]);
+  ns.textPath = function(text, path, measure, draw, textAlign) {
+    var pathLength = 0;
+    var p1 = path[0]
+    for (var i = 1, ii = path.length; i < ii; ++i) {
+      var p2 = path[i];
+      pathLength += Math.sqrt(Math.pow(p2[0] - p1[0], 2) + Math.pow(p2[1] - p1[1], 2));
+      p1 = p2;
+    }
+    var textLength = measure(text);
+    var align = textAlign == 'left' ? 0 : textAlign == 'right' ? 1 : 0.5;
+    var startM = (pathLength - textLength) * align;
+    var offset = 0;
+    var end = path.length;
+
+    // Keep text upright
+    var reverse = path[offset][0] > path[end - 1][0];
+
+    var numChars = text.length;
+
+    var x1 = path[offset][0];
+    var y1 = path[offset][1];
+    offset += 1;
+    var x2 = path[offset][0];
+    var y2 = path[offset][1];
+    var segmentM = 0;
+    var segmentLength = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+
+    var index;
+    for (var i = 0; i < numChars; ++i) {
+      index = reverse ? numChars - i - 1 : i;
+      var char = text[index];
+      var charLength = measure(char);
+      var charM = startM + charLength / 2;
+      while (offset < end - 1 && segmentM + segmentLength < charM) {
+        x1 = x2;
+        y1 = y2;
+        offset += 1;
+        x2 = path[offset][0];
+        y2 = path[offset][1];
+        segmentM += segmentLength;
+        segmentLength = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+      }
+      var segmentPos = charM - segmentM;
+      var angle = Math.atan2(y2 - y1, x2 - x1);
+      if (reverse) {
+        angle += angle > 0 ? -Math.PI : Math.PI;
+      }
+      var interpolate = segmentPos / segmentLength;
+      var x = x1 + interpolate * (x2 - x1);
+      var y = y1 + interpolate * (y2 - y1);
+      draw(char, x, y, angle);
+      startM += charLength;
+    }
+  }
+  /*ns.textPath = function(t) {
+    function r(a) {
+      if (e[a]) return e[a].exports;
+      var n=e[a]={i:a,l:!1,exports:{}};
+      return t[a].call(n.exports,n,n.exports,r),n.l=!0,n.exports
+    }
+    var e={};
+    return r.m=t,r.c=e,r.d=function(t,e,a){
+      r.o(t,e) || Object.defineProperty(t,e,{configurable:!1,enumerable:!0,get:a})
+    },r.n=function(t){
+      var e=t&&t.__esModule?function(){
+        return t.default
+      }:function(){return t};
+      return r.d(e,"a",e),e
+    },r.o=function(t,r){
+      return Object.prototype.hasOwnProperty.call(t,r)
+    },r.p="",r(r.s=0)
+  }([
+    function(t,r,e){
+      "use strict";
+      function a(t,r,e,a,n){
+        for(var o=0,u=r[0],f=1,h=r.length;f<h;++f){
+          var l=r[f];
+          o+=Math.sqrt(Math.pow(l[0]-u[0],2)+Math.pow(l[1]-u[1],2)),u=l
+        }
+        var p=e(t),c="left"==n?0:"right"==n?1:.5,i=(o-p)*c,s=0,M=r.length,v=r[s][0]>r[M-1][0],d=t.length,w=r[s][0],x=r[s][1];
+        s+=1;
+        for(var g,P=r[s][0],b=r[s][1],y=0,O=Math.sqrt(Math.pow(P-w,2)+Math.pow(b-x,2)),f=0;f<d;++f){
+          g=v?d-f-1:f;
+          for(var _=t[g],j=e(_),q=i+j/2;s<M-1&&y+O<q;)
+            w=P,x=b,s+=1,P=r[s][0],b=r[s][1],y+=O,O=Math.sqrt(Math.pow(P-w,2)+Math.pow(b-x,2));
+          var m=q-y,I=Math.atan2(b-x,P-w);
+          v&&(I+=I>0?-Math.PI:Math.PI);
+          var k=m/O;a(_,w+k*(P-w),x+k*(b-x),I),i+=j
+        }
+      }
+      Object.defineProperty(r,"__esModule",{value:!0}),r.default=a,t.exports=r.default
+    }
+  ]);*/
 
   ns.drawEdgesLayer = function(options) {
     ns.log("Draw edges...")
