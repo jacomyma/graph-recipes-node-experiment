@@ -8,7 +8,8 @@ const d3 = require('d3')
 // Read file
 var gexf_string;
 try {
-    gexf_string = fs.readFileSync('data/08 with topic scores.gexf', 'utf8');
+    // gexf_string = fs.readFileSync('data/08 with topic scores.gexf', 'utf8');
+    gexf_string = fs.readFileSync('data/test.gexf', 'utf8');
     console.log('GEXF file loaded');    
 } catch(e) {
     console.log('Error:', e.stack);
@@ -39,7 +40,7 @@ settings.rendering_dpi = 72 // Default: same as output_dpi. You can over- or und
 // Tiling allows to build images that would be otherwise too large.
 // You will have to assemble them by yourself.
 settings.tile_factor = 3 // Integer, default 1. Number of rows and columns of the grid of exported images.
-settings.tile_to_render = [1, 1] // Grid coordinates, as integers
+settings.tile_to_render = [0, 1] // Grid coordinates, as integers
 
 // Orientation & layout:
 settings.flip_x = false
@@ -53,18 +54,18 @@ settings.margin_left   = 24 // in mm
 // Layers:
 // Decide which layers are drawn.
 // The settings for each layer are below.
-settings.draw_background = true
-settings.draw_hillshading = true
-settings.draw_network_shape_fill = false
+settings.draw_background            = true
+settings.draw_hillshading           = true
+settings.draw_network_shape_fill    = false
 settings.draw_network_shape_contour = false
-settings.draw_cluster_fills = false
-settings.draw_cluster_contours = false
-settings.draw_cluster_labels = false
-settings.draw_edges = false
-settings.draw_node_shadows = true
-settings.draw_nodes = true
-settings.draw_node_labels = false
-settings.draw_connected_closeness = false
+settings.draw_cluster_fills         = false
+settings.draw_cluster_contours      = false
+settings.draw_cluster_labels        = false
+settings.draw_edges                 = false
+settings.draw_node_shadows          = true
+settings.draw_nodes                 = true
+settings.draw_node_labels           = false
+settings.draw_connected_closeness   = false
 
 // Layer: Background
 settings.background_color = "#fafaef"
@@ -126,10 +127,9 @@ settings.edge_high_quality = true // Halo around nodes // Time-consuming
 settings.edge_color = "#715035"
 
 // Layer: Node shadows
-settings.node_color_shadow = true
-settings.node_color_shadow_offset = 1.8 // mm
-settings.node_color_shadow_blur_radius = 8 // mm
-settings.node_color_shadow_opacity = .6
+settings.node_color_shadow_offset = 18 // mm; larger than you'd think (gradient)
+settings.node_color_shadow_opacity = .3
+settings.node_color_shadow_blur_radius = 3 // mm
 
 // Layer: Nodes
 settings.adjust_voronoi_range = 100 // Factor // Larger node halo
@@ -143,7 +143,7 @@ settings.node_fill_color = "#283535"
 // Layer: Node labels
 settings.label_color = "#283535"
 settings.label_color_from_node = true
-settings.label_count = Infinity
+settings.label_count = 1000
 settings.label_max_length = 42 // Number of characters before truncate. Infinity is a valid value.
 settings.label_font_family = "Raleway"
 settings.label_font_min_size = 4 // in pt
@@ -241,10 +241,10 @@ settings.node_clusters = {
     "undefined": {
       "label": "undefined",
       "count": 13920,
-      "color": "#6f6d70"
+      "color": "#918895"
     }
   },
-  "default_color": "#6f6d70"
+  "default_color": "#918895"
 }
 
 // Advanced settings
@@ -326,7 +326,7 @@ newRenderer = function(){
 
     // Draw node shadows
     if (ns.settings.draw_node_shadows) {
-      layeredImage = ns.overlayLayer(layeredImage,
+      bgImage = ns.overlayLayer(bgImage,
         ns.drawNodesShadowLayer(ns.settings),
         "multiply"
       )
@@ -1141,7 +1141,7 @@ newRenderer = function(){
     ctx.drawImage(canvas2, 0, 0)
 
     return ctx.getImageData(0, 0, backgroundImg.width, backgroundImg.height)
-  }  
+  }
 
   ns.getModalities = function() {
     // Cache
@@ -2325,7 +2325,7 @@ newRenderer = function(){
         var ny = n.y
 
         ctx.font = ns.buildLabelFontContext(options, n.size)
-        var fontSize = +ctx.font.split('px')[0]
+        var fontSize = +ctx.font.replace('bold ', '').split('px')[0]
         var label = ns.tuneLabelString(n.label, options)
 
         // Create new empty canvas for the bounding area of that label
@@ -2436,6 +2436,9 @@ newRenderer = function(){
 
           // Update count
           labelDrawCount--
+          if (labelDrawCount%100 == 0) {
+            ns.log2('...'+labelDrawCount+' displayable labels to find...')
+          }
 
           // Add to draw pipe
           visibleLabels.push(nid)
@@ -2955,62 +2958,104 @@ newRenderer = function(){
     options.node_color_shadow_opacity = (options.node_color_shadow_opacity===undefined)?(.5):(options.node_color_shadow_opacity)
     options.node_color_shadow_offset = (options.node_color_shadow_offset===undefined)?(3):(options.node_color_shadow_offset) // In mm
     options.node_color_shadow_ratio = (options.node_color_shadow_ratio===undefined)?(1.5):(options.node_color_shadow_ratio)
-    options.node_color_shadow_blur_radius = 2.4 // in mm
     options.node_fill_color = options.node_fill_color || "#FFF"
+    options.node_color_shadow_blur_radius = (options.node_color_shadow_blur_radius===undefined)?(3.):(options.node_color_shadow_blur_radius) // mm
 
-    var g = ns.g
-    var ctx = ns.createCanvas().getContext("2d")
-    ns.scaleContext(ctx)
-    ns.paintAll(ctx, "#FFFFFF")
+    // Cache
+    if (ns._nodeShadows) {
+      var ctx = ns.createCanvas().getContext("2d")
+      ctx.putImageData(ns._nodeShadows, 0, 0)
+      // Rescale to tile
+      ns.scaleContext(ctx)
+      ctx.drawImage(ctx.canvas, 0, 0)
+      // Final opacity adjustment (composition makes opacity = darkness)
+      ns.paintAll(ctx, 'rgba(255, 255, 255, '+(1-options.node_color_shadow_opacity)+')')
+      ns.report("...done.")
+      return ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
 
-    // Shadows
-    ctx.lineCap="round"
-    ctx.lineJoin="round"
-    var radiusRatioMax = options.node_color_shadow_ratio
-    var radiusRatio = radiusRatioMax
-    var radiusOffsetMax = ns.mm_to_px(options.node_color_shadow_offset)
-    var radiusOffset = radiusOffsetMax
-    var steps = 64
-    ctx.shadowColor = 'transparent'
-    ctx.lineWidth = 0
-    while (steps--> 0) {
-      radiusRatio -= (radiusRatioMax-1)/steps
-      radiusOffset -= radiusOffsetMax/steps
-      ns.getNodesBySize().forEach(function(nid){
-        var n = g.getNodeAttributes(nid)
-        var color = d3.color(ns.getNodeColor(options, n))
+    } else {
 
-        // Tune the color to be a bit more vivid, a bit less dark
-        var hsl = d3.hsl(color)
-        hsl.l = Math.min(1, hsl.l * 1.2)
-        hsl.s = Math.min(1, hsl.s * 1.1)
+      var g = ns.g
+      var ctx = ns.createCanvas().getContext("2d")
+
+      var gradient = function(d){
+        return Math.round(10000*
+          (0.5 + 0.5 * Math.cos(Math.PI - Math.pow(d, 4) * Math.PI))
+        )/10000
+      }
+
+      // Shadows
+      var radiusRatioMax = options.node_color_shadow_ratio
+      var radiusOffsetMax = ns.mm_to_px(options.node_color_shadow_offset)
+      // Steps must produce sub-pixel increments even for the biggest node
+      var maxNodeSize = ns.getNodeSizeExtent()[1]
+      var totalSteps = Math.ceil(2 * (maxNodeSize * radiusRatioMax * options.node_size + radiusOffsetMax) * ns.settings.tile_factor)
+      var steps = totalSteps
+
+      ctx.lineCap="round"
+      ctx.lineJoin="round"
+      ctx.shadowColor = 'transparent'
+      ctx.lineWidth = 0
+
+      // Color
+      ns.paintAll(ctx, "#FFFFFF")
+      steps = totalSteps
+      while (--steps>0) {
+        if (steps%100 == 0) {
+          ns.log2('...'+steps+' steps left in node shadows color drawing...')
+        }
+
+        var radiusRatio = 1 + (radiusRatioMax-1)*steps/totalSteps
+        var radiusOffset = radiusOffsetMax*steps/totalSteps
+        var progress = 1-steps/totalSteps
+        var layerOpacity = gradient(progress)
         
-        color = d3.color(hsl)
-        color.opacity = 1/32
+        ns.getNodesBySize().forEach(function(nid){
+          var n = g.getNodeAttributes(nid)
 
-        var radius = radiusRatio * options.node_size * n.size + radiusOffset
+          // Color
+          var color = d3.color(ns.getNodeColor(options, n))
 
-        ctx.beginPath()
-        ctx.arc(n.x, n.y, radius, 0, 2 * Math.PI, false)
-        ctx.fillStyle = color.toString()
-        ctx.fill()
+          // Tune the color to be a bit more vivid, a bit less dark
+          var hsl = d3.hsl(color)
+          hsl.l = Math.min(1, hsl.l * 1.2)
+          hsl.s = Math.min(1, hsl.s * 1.1)
 
-      })
+          // Bluriness (actually whiteness)
+          hsl.l = (1-layerOpacity)*1 + layerOpacity*hsl.l
+
+          color = d3.color(hsl)
+          
+          color.opacity = .5 // Blending
+
+          var radius = radiusRatio * options.node_size * n.size + radiusOffset
+
+          ctx.fillStyle = color.toString()
+          ctx.beginPath()
+          ctx.arc(n.x, n.y, radius, 0, 2 * Math.PI, false)
+          ctx.fill()
+        })
+      }
+
+      // Blur
+      if (options.node_color_shadow_blur_radius > 0) {
+        var blurRadius = ns.mm_to_px(options.node_color_shadow_blur_radius)
+        var imgd = ns.blur(ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height), blurRadius, ctx)
+        ctx.putImageData(imgd,0, 0)
+      }
+
+      ns._nodeShadows = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
+
+      // Rescale to tile
+      ns.scaleContext(ctx)
+      ctx.drawImage(ctx.canvas, 0, 0)
+
+      // Final opacity adjustment (composition makes opacity = darkness)
+      ns.paintAll(ctx, 'rgba(255, 255, 255, '+(1-options.node_color_shadow_opacity)+')')
+
+      ns.report("...done.")
+      return ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
     }
-
-    // Blur
-    var blurRadius = ns.mm_to_px(options.node_color_shadow_blur_radius) * ns.settings.tile_factor
-    var imgd = ns.blur(ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height), blurRadius, ctx)
-    
-    var data = imgd.data;
-    for (let i = 3; i < data.length; i += 4) {
-      data[i] = Math.floor(options.node_color_shadow_opacity*data[i])
-    }
-
-    ctx.putImageData(imgd,0, 0)
-
-    ns.report("...done.")
-    return ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
   }
 
   ns.drawNodesLayer = function(options) {
