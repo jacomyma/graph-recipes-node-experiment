@@ -8,8 +8,7 @@ const d3 = require('d3')
 // Read file
 var gexf_string;
 try {
-    gexf_string = fs.readFileSync('data/08 with topic scores.gexf', 'utf8');
-    // gexf_string = fs.readFileSync('data/test.gexf', 'utf8');
+    gexf_string = fs.readFileSync('data/05 spat size betweenness (recomputed).gexf', 'utf8');
     console.log('GEXF file loaded');    
 } catch(e) {
     console.log('Error:', e.stack);
@@ -31,15 +30,15 @@ console.log('GEXF parsed');
 var settings = {}
 
 // Image size and resolution
-settings.image_width = 1000 // in mm. Default: 200mm (fits in a A4 page)
-settings.image_height = 800
-settings.output_dpi = 300 // Dots per inch.
-settings.rendering_dpi = 300 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
+settings.image_width = 2*290 // in mm. Default: 200mm (fits in a A4 page)
+settings.image_height = 2*290
+settings.output_dpi = 450 // Dots per inch.
+settings.rendering_dpi = 450 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
 
 // Tiling:
 // Tiling allows to build images that would be otherwise too large.
 // You will have to assemble them by yourself.
-settings.tile_factor = 1 // Integer, default 1. Number of rows and columns of the grid of exported images.
+settings.tile_factor = 3 // Integer, default 1. Number of rows and columns of the grid of exported images.
 settings.tile_to_render = [0, 0] // Grid coordinates, as integers
 
 // Orientation & layout:
@@ -61,10 +60,10 @@ settings.draw_network_shape_contour = false
 settings.draw_cluster_fills         = false
 settings.draw_cluster_contours      = false
 settings.draw_cluster_labels        = false
-settings.draw_edges                 = false
-settings.draw_node_shadows          = true
+settings.draw_edges                 = true
+settings.draw_node_shadows          = false
 settings.draw_nodes                 = true
-settings.draw_node_labels           = false
+settings.draw_node_labels           = true
 settings.draw_connected_closeness   = false
 
 // Layer: Background
@@ -119,12 +118,11 @@ settings.cluster_label_border_thickness = 1.6 // In mm
 settings.cluster_label_inner_color = "#ffffff" // Note: here color is on the border
 
 // Layer: Edges
-settings.max_edge_count = Infinity
 settings.edge_thickness = 0.05 // in mm
-settings.edge_alpha = .6 // Opacity // Range from 0 to 1
-settings.edge_curved = true
+settings.edge_alpha = .4 // Opacity // Range from 0 to 1
+settings.edge_curved = false
 settings.edge_high_quality = true // Halo around nodes // Time-consuming
-settings.edge_color = "#715035"
+settings.edge_color = "#6b7660"
 
 // Layer: Node shadows
 settings.node_color_shadow_offset = 18 // mm; larger than you'd think (gradient)
@@ -133,9 +131,9 @@ settings.node_color_shadow_blur_radius = 3 // mm
 
 // Layer: Nodes
 settings.adjust_voronoi_range = 100 // Factor // Larger node halo
-settings.node_size = 1. // Factor to adjust the nodes drawing size
+settings.node_size = .8 // Factor to adjust the nodes drawing size
 settings.node_color_original = false // Use the original node color
-settings.node_color_by_modalities = true // Use the modalities to color nodes (using settings.node_clusters)
+settings.node_color_by_modalities = false // Use the modalities to color nodes (using settings.node_clusters)
 settings.node_stroke_width = 0.01 // mm
 settings.node_stroke_color = "#FFFFFF"
 settings.node_fill_color = "#283535"
@@ -146,9 +144,9 @@ settings.label_color_from_node = true
 settings.label_count = 1000
 settings.label_max_length = 42 // Number of characters before truncate. Infinity is a valid value.
 settings.label_font_family = "Raleway"
-settings.label_font_min_size = 4 // in pt
-settings.label_font_max_size = 14  // in pt
-settings.label_font_thickness = .18
+settings.label_font_min_size = 5 // in pt
+settings.label_font_max_size = 10  // in pt
+settings.label_font_thickness = .2
 settings.label_border_thickness = .8 // in mm
 settings.label_spacing_offset = 1.5 // in mm (prevents label overlap)
 settings.label_border_color = "#FFFFFF"
@@ -162,118 +160,29 @@ settings.label_path_step_angle_range = Math.PI/128 // From 0 (straight) to PI (a
 // modalities have which colors. You can generate this
 // JSON object with the PREPARE script.
 settings.node_clusters = {
-  "attribute_id": "cluster",
+  "attribute_id": "modularity_class",
   "modalities": {
-    // Red-pink
-    "Mélenchon": {
-      "label": "Mélenchon", // Side side left
-      "count": 877,
-      "color": "#94002a"
-    },
-    "Gauche/Opposition droites": {
-      "label": "Gauche/Opposition droites", // Not that many...
-      "count": 457,
-      "color": "#bc4b80"
-    },
-    "Gauches (et LREM gauche)": {
-      "label": "Gauches (et LREM gauche)", // Same areas but center
-      "count": 109,
-      "color": "#ec5195"
-    },
-    "Médias/Personnalités politiques gauche": { // FEW: pink highlights
-      "label": "Médias/Personnalités politiques gauche",
-      "count": 14,
-      "color": "#fe00fd"
-    },
-
-    // Blue
-    "Médias/Personnalités politiques droite": { // Few, blue, highlight
-      "label": "Médias/Personnalités politiques droite",
-      "count": 37,
-      "color": "#00f0ff"
-    },
-    "Personnalités extrême-droite (avec Pécresse)": { // Similar to above: accent! Color?
-      "label": "Personnalités extrême-droite (avec Pécresse)",
-      "count": 6,
-      "color": "#00b8ae"
-    },
-    "Zemmour1": { // More on the side: brown??
-      "label": "Zemmour1",
-      "count": 120,
-      "color": "#7e8e59"
-    },
-    "Zemmour2": { // Many many: more grey? more brown?
-      "label": "Zemmour2",
-      "count": 674,
-      "color": "#888d5f"
-    },
-    "Zemmour3": { // Big counts: highlight color
-      "label": "Zemmour3",
-      "count": 14,
-      "color": "#a5a414"
-    },
-    "Zemmour4": { // Many many, but more blue? Like the right?
-      "label": "Zemmour4",
-      "count": 3347,
-      "color": "#03879d"
-    },
-    "Extrême-droite (RN/Zemmour)": { // Few on the sides, brown!
-      "label": "Extrême-droite (RN/Zemmour)",
-      "count": 505,
-      "color": "#723c0f"
-    },
-
-    // Yellow (or grey?)
-    "Anti-gouvernement/pass": {
-      "label": "Anti-gouvernement/pass",
-      "count": 6950,
-      "color": "#e5b15d"
-    },
-
-    // Black or super-highlights?
-    "3 Candidats": {
-      "label": "3 Candidats",
-      "count": 3,
-      "color": "#000000"
-    },
-
-    // Gray
-    "undefined": {
-      "label": "undefined",
-      "count": 13920,
-      "color": "#918895"
-    }
   },
-  "default_color": "#918895"
+  "default_color": "#787c79"
 }
 
 // Advanced settings
-settings.voronoi_range = 1.2 // Halo size in mm
+settings.voronoi_range = 2.8 // Halo size in mm
 settings.voronoi_resolution_max = 1 * Math.pow(10, 7) // in pixel. 10^7 still quick, 10^8 better quality 
 settings.heatmap_resolution_max = 1 * Math.pow(10, 5) // in pixel. 10^5 quick. 10^7 nice but super slow.
-settings.heatmap_spreading = 5 // in mm
+settings.heatmap_spreading = settings.image_width / 64 // in mm
 
 // Experimental stuff
-settings.hillshading_strength = 30
-settings.hillshading_color = "#7f7746"
-settings.hillshading_alpha = .6 // Opacity
-settings.hillshading_sun_azimuth = Math.PI * 0.6 // angle in radians
-settings.hillshading_sun_elevation = Math.PI * 0.4 // angle in radians
+settings.hillshading_strength = 64
+settings.hillshading_color = "#979272"
+settings.hillshading_alpha = .5 // Opacity
+settings.hillshading_sun_azimuth = Math.PI * 0.8 // angle in radians
+settings.hillshading_sun_elevation = Math.PI * 0.3 // angle in radians
 settings.hillshading_hypsometric_gradient = true // Elevation gradient color
 
 /// (END OF SETTINGS)
 
-// Custom modifications
-const edgeTopic = 'topic_7'
-const regex = /[^A-zÀ-ÿ0-9 ]*/gi;
-g.nodes().forEach(nid => {
-  var n = g.getNodeAttributes(nid)
-  n.label = n.label.replace(regex, '').trim()
-})
-g.edges().forEach(eid => {
-  var e = g.getEdgeAttributes(eid)
-  e.opacity = +e[edgeTopic]
-})
+
 
 /// RENDERER
 var newRenderer
@@ -596,9 +505,7 @@ newRenderer = function(){
         ns.log2("Draw hypsometric gradient...")
         let colorGradient = d3.scaleLinear()
           .domain([0, mid_threshold*0.8, mid_threshold*1.2, 1])
-          // .range(['#627678', '#8da7a2', '#acb5a6', '#f1f2e8'])
-          // .range(['#6989a1', '#8da2a7', '#acb5a6', '#f1f2e8'])
-          .range(['#92afc4', '#b2ced5', '#cfd7ca', '#f1f2e8'])
+          .range(['#748b9b', '#b2ced5', '#e2e0d3', '#f1f2e8'])
           .interpolate(d3.interpolateRgb); //interpolateHsl interpolateHcl interpolateRgb
         let hmData = new Uint8ClampedArray(dim.w * dim.h * 4)
         let xOffset = -dim.w*ns.settings.tile_to_render[0]
@@ -3854,5 +3761,5 @@ newRenderer = function(){
 
 /// FINALLY, RENDER
 let renderer = newRenderer()
-renderer.renderAndSave(g, settings)
-// renderer.renderAndSaveAllTiles(g, settings)
+// renderer.renderAndSave(g, settings)
+renderer.renderAndSaveAllTiles(g, settings)
