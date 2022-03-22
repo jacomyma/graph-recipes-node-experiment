@@ -10,10 +10,10 @@
     "dom-parser": "^0.1.6",
     "fs": "0.0.1-security",
     "graphology": "^0.19.3",
-    "graphology-gexf": "^0.7.5",
-    "jsdom": "^16.5.3"
+    "graphology-gexf": "^0.10.1",
+    "jsdom": "^16.5.3",
+    "sharp": "^0.30.3"
   },
-  "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
