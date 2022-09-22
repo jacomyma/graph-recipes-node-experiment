@@ -8,7 +8,7 @@ const d3 = require('d3')
 // Read file
 var gexf_string;
 try {
-    gexf_string = fs.readFileSync('data/08 clusters aggregated.gexf', 'utf8');
+    gexf_string = fs.readFileSync('data/network_spat.gexf', 'utf8');
     // gexf_string = fs.readFileSync('data/test.gexf', 'utf8');
     console.log('GEXF file loaded');    
 } catch(e) {
@@ -30,11 +30,20 @@ console.log('GEXF parsed');
 
 var settings = {}
 
+// Orientation & layout:
+settings.flip_x = false
+settings.flip_y = true
+settings.rotate = 0 // In degrees, clockwise
+settings.margin_top    = 12 // in mm
+settings.margin_right  = 12 // in mm
+settings.margin_bottom = 12 // in mm
+settings.margin_left   = 12 // in mm
+
 // Image size and resolution
-settings.image_width = 1.5*630 // in mm. Default: 200mm (fits in a A4 page)
-settings.image_height = 1.5*470
-settings.output_dpi = 600 // Dots per inch.
-settings.rendering_dpi = 600 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
+settings.image_width = 280 + settings.margin_left + settings.margin_right // in mm. Default: 200mm (fits in a A4 page)
+settings.image_height = 280 + settings.margin_top + settings.margin_bottom
+settings.output_dpi = 300 // Dots per inch.
+settings.rendering_dpi = 72 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
 
 // Tiling:
 // Tiling allows to build images that would be otherwise too large.
@@ -42,29 +51,20 @@ settings.rendering_dpi = 600 // Default: same as output_dpi. You can over- or un
 settings.tile_factor = 1 // Integer, default 1. Number of rows and columns of the grid of exported images.
 settings.tile_to_render = [0, 0] // Grid coordinates, as integers
 
-// Orientation & layout:
-settings.flip_x = false
-settings.flip_y = true
-settings.rotate = 0 // In degrees, clockwise
-settings.margin_top    = 24 // in mm
-settings.margin_right  = 24 // in mm
-settings.margin_bottom = 24 // in mm
-settings.margin_left   = 24 // in mm
-
 // Layers:
 // Decide which layers are drawn.
 // The settings for each layer are below.
 settings.draw_background            = true
-settings.draw_hillshading           = false
+settings.draw_hillshading           = true
 settings.draw_network_shape_fill    = false
 settings.draw_network_shape_contour = false
 settings.draw_cluster_fills         = false
 settings.draw_cluster_contours      = false
 settings.draw_cluster_labels        = false
 settings.draw_edges                 = false
-settings.draw_node_shadows          = false
+settings.draw_node_shadows          = true
 settings.draw_nodes                 = true
-settings.draw_node_labels           = true
+settings.draw_node_labels           = false
 settings.draw_connected_closeness   = false
 
 // Layer: Background
@@ -127,15 +127,15 @@ settings.edge_high_quality = true // Halo around nodes // Time-consuming
 settings.edge_color = "#6b7660"
 
 // Layer: Node shadows
-settings.node_color_shadow_offset = 18 // mm; larger than you'd think (gradient)
+settings.node_color_shadow_offset = 4 // mm; larger than you'd think (gradient)
 settings.node_color_shadow_opacity = .3
 settings.node_color_shadow_blur_radius = 3 // mm
 
 // Layer: Nodes
 settings.adjust_voronoi_range = 100 // Factor // Larger node halo
 settings.node_size = 1. // Factor to adjust the nodes drawing size
-settings.node_color_original = false // Use the original node color
-settings.node_color_by_modalities = true // Use the modalities to color nodes (using settings.node_clusters)
+settings.node_color_original = true // Use the original node color
+settings.node_color_by_modalities = false // Use the modalities to color nodes (using settings.node_clusters)
 settings.node_stroke_width = 0.01 // mm
 settings.node_stroke_color = "#FFFFFF"
 settings.node_fill_color = "#283535"
@@ -143,13 +143,13 @@ settings.node_fill_color = "#283535"
 // Layer: Node labels
 settings.label_color = "#283535"
 settings.label_color_from_node = true
-settings.label_count = 100 //500
+settings.label_count = 100
 settings.label_max_length = 42 // Number of characters before truncate. Infinity is a valid value.
 settings.label_font_family = "Raleway"
-settings.label_font_min_size = 7.5 // in pt
-settings.label_font_max_size = 16  // in pt
+settings.label_font_min_size = 7.3 // in pt
+settings.label_font_max_size = 14  // in pt
 settings.label_font_thickness = .3
-settings.label_border_thickness = .8 // in mm
+settings.label_border_thickness = .7 // in mm
 settings.label_spacing_offset = 1.5 // in mm (prevents label overlap)
 settings.label_border_color = "#FFFFFF"
 settings.label_curved_path = true // Curved labels
@@ -162,66 +162,6 @@ settings.label_curved_path = true // Curved labels
 settings.node_clusters = {
   "attribute_id": "couleur politique",
   "modalities": {
-    "Ext Gauche": {
-      "label": "Ext Gauche",
-      "count": 117,
-      "color": "#f1001c"
-    },
-    "ext Gauche": {
-      "label": "ext Gauche",
-      "count": 1,
-      "color": "#f1001c"
-    },
-    "Gauche": {
-      "label": "Gauche",
-      "count": 16,
-      "color": "#fe47e1"
-    },
-    "Ecolo": {
-      "label": "Ecolo",
-      "count": 12,
-      "color": "#23b73d"
-    },
-    "Centre": {
-      "label": "Centre",
-      "count": 94,
-      "color": "#ff9f0e"
-    },
-    "Droite": {
-      "label": "Droite",
-      "count": 99,
-      "color": "#0890c5"
-    },
-    "Souverainiste": {
-      "label": "Souverainiste",
-      "count": 2,
-      "color": "#02279c"
-    },
-    "MLP": {
-      "label": "MLP",
-      "count": 40,
-      "color": "#8e6300"
-    },
-    "Reconquête": {
-      "label": "Reconquête",
-      "count": 218,
-      "color": "#5b3917"
-    },
-    "Antisystème": {
-      "label": "Antisystème",
-      "count": 33,
-      "color": "#ccd100"
-    },
-    "Media": {
-      "label": "Media",
-      "count": 115,
-      "color": "#6b6b6b"
-    },
-    "media": {
-      "label": "media",
-      "count": 3,
-      "color": "#6b6b6b"
-    },
   },
   "default_color": "#afafac"
 }
@@ -230,7 +170,7 @@ settings.node_clusters = {
 settings.voronoi_range = 1.2 // Halo size in mm
 settings.voronoi_resolution_max = 1 * Math.pow(10, 7) // in pixel. 10^7 still quick, 10^8 better quality 
 settings.heatmap_resolution_max = 1 * Math.pow(10, 5) // in pixel. 10^5 quick. 10^7 nice but super slow.
-settings.heatmap_spreading = settings.image_width / 256 // in mm
+settings.heatmap_spreading = (settings.image_width - settings.margin_left - settings.margin_right) / 256 // in mm
 
 // Experimental stuff
 settings.hillshading_strength = 30
@@ -243,44 +183,15 @@ settings.hillshading_hypsometric_gradient = true // Elevation gradient color
 /// (END OF SETTINGS)
 
 // Custom modifications
-const regex = /[^A-zÀ-ÿ0-9 ]*/gi;
+const regex = /[^A-zÀ-ÿ0-9 '\-#&]*/gi;
 g.nodes().forEach(nid => {
   let n = g.getNodeAttributes(nid)
-  n.label = n.label.replace(regex, '').trim()
+  n.label = (n.label || n.Label || '').replace(regex, '').trim()
 })
-/*
-const edgeTopic = 'topic_7'
-g.edges().forEach(eid => {
-  var e = g.getEdgeAttributes(eid)
-  e.opacity = +e[edgeTopic]
-})
-*/
 // For shadow
 g.nodes().forEach(nid => {
   let n = g.getNodeAttributes(nid)
-  n.drawShadow = n['couleur politique'] !== undefined
-})
-// Candidates
-const candidates = {
-  '1003575248': true, // Nathalie Arthaud
-  '38170599': true, // Nicolas Dupont-Aignan
-  '26073581':true, // Anne Hidalgo
-  '117761523':true, // Yannick Jadot
-  '102722347':true, // Jean Lassalle
-  '217749896':true, // Marine Le Pen
-  '1976143068':true, // Emmanuel Macron
-  '80820758':true, // Jean-Luc Mélenchon
-  '49969223': true, // Valérie Pécresse
-  '374392774':true, // Philippe Poutou
-  '1324449588':true, // Fabien Roussel
-  '1183418538285027329': true // Eric Zemmour
-}
-g.nodes().forEach(nid => {
-  let n = g.getNodeAttributes(nid)
-  n.important = !!candidates[nid]
-  if (n.important) {
-    console.log("Important node:", nid, n.label)
-  }
+  n.drawShadow = n.colored == "yes"
 })
 
 /// RENDERER
@@ -2174,20 +2085,24 @@ newRenderer = function(){
       // Set the central segment
       var i = Math.floor(nx*settings.tile_factor) + Math.floor(ny*settings.tile_factor)*dim.w*ns.settings.tile_factor
       originalAngle = Math.atan2(dyPixelMap[i], dxPixelMap[i])
-      if (options.label_path_downhill) {
-        angle = Math.atan2(dyPixelMap[i], dxPixelMap[i])
+      if (n.labelStartAngle !== undefined) {
+        angle = -n.labelStartAngle // The minus sign is to stick to the trigonometric convention for the label
       } else {
-        angle = Math.atan2(dxPixelMap[i], -dyPixelMap[i])
-      }
-      // Note: angle is in [-PI, PI] at this stage
-      if (Math.PI/2 < angle && angle < Math.PI - options.label_path_starting_angle_range/2) {
-        angle = Math.PI - options.label_path_starting_angle_range/2
-      } else if (options.label_path_starting_angle_range/2 < angle && angle < Math.PI/2 ) {
-        angle = options.label_path_starting_angle_range/2
-      } else if (-Math.PI/2 < angle && angle < -options.label_path_starting_angle_range/2 ) {
-        angle = -options.label_path_starting_angle_range/2
-      } else if (-Math.PI + options.label_path_starting_angle_range/2 < angle && angle < -Math.PI/2 ) {
-        angle = -Math.PI + options.label_path_starting_angle_range/2
+        if (options.label_path_downhill) {
+          angle = Math.atan2(dyPixelMap[i], dxPixelMap[i])
+        } else {
+          angle = Math.atan2(dxPixelMap[i], -dyPixelMap[i])
+        }
+        // Note: angle is in [-PI, PI] at this stage
+        if (Math.PI/2 < angle && angle < Math.PI - options.label_path_starting_angle_range/2) {
+          angle = Math.PI - options.label_path_starting_angle_range/2
+        } else if (options.label_path_starting_angle_range/2 < angle && angle < Math.PI/2 ) {
+          angle = options.label_path_starting_angle_range/2
+        } else if (-Math.PI/2 < angle && angle < -options.label_path_starting_angle_range/2 ) {
+          angle = -options.label_path_starting_angle_range/2
+        } else if (-Math.PI + options.label_path_starting_angle_range/2 < angle && angle < -Math.PI/2 ) {
+          angle = -Math.PI + options.label_path_starting_angle_range/2
+        }
       }
 
       var initAngle = angle
@@ -2310,6 +2225,7 @@ newRenderer = function(){
 
     options = options || {}
     options.label_collision_pixmap_max_resolution = options.label_collision_pixmap_max_resolution || 10000000 // 10 megapixel
+    options.label_collision_include_node = true
     // For monitoring
     options.download_image = false // For monitoring the process
 
@@ -2351,6 +2267,7 @@ newRenderer = function(){
     // Evaluate labels
     var labelDrawCount = options.label_count
     var offset = ns.mm_to_px(options.label_spacing_offset)
+    var stroke_width = ns.mm_to_px(options.node_stroke_width || 0)
     var count = 0
     nodesBySize
     .forEach(function(nid){
@@ -2453,7 +2370,7 @@ newRenderer = function(){
           }
         } else {
           collision = true
-          console.log("Warning: path of length 0 for "+nid+" ("+label+"):")
+          // console.log("Warning: path of length 0 for "+nid+" ("+label+"):")
         }
 
         if (!collision || n.important) { // Custom: important
@@ -2473,6 +2390,16 @@ newRenderer = function(){
             ctx.lineTo(x, y)
           }
           ctx.stroke()
+
+          // Draw the node itself if needed
+          if (options.label_collision_include_node) {
+            var radius = Math.max(options.node_size * n.size, stroke_width)
+            ctx.beginPath()
+            ctx.arc(n.x, n.y, radius - 0.5*stroke_width, 0, 2 * Math.PI, false)
+            ctx.lineWidth = 0
+            ctx.fillStyle = '#FFF'
+            ctx.fill()
+          }
 
           // Update count
           labelDrawCount--
@@ -3891,5 +3818,5 @@ newRenderer = function(){
 
 /// FINALLY, RENDER
 let renderer = newRenderer()
-renderer.renderAndSave(g, settings)
+renderer.renderAndSave(g, settings, 'Carto') // Custom
 // renderer.renderAndSaveAllTiles(g, settings)

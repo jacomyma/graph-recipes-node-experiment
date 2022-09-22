@@ -10,8 +10,9 @@ node experiment.js
 ## Out of memory
 In case the defatul 1 Gb RAM is not enough, specify a higher limit. For instance:
 ```
-node --max-old-space-size=8192 experiment.js
+node --max-old-space-size=16384 experiment.js
 ```
+Values: 8192, 16384, 32768...
 
 ## Assembling tiles
 You can assemble tiles with ImageMagick. For instance for a grid of 2x2 tiles
