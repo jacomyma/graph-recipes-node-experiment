@@ -34,16 +34,16 @@ var settings = {}
 settings.flip_x = false
 settings.flip_y = true
 settings.rotate = 0 // In degrees, clockwise
-settings.margin_top    = 12 // in mm
+settings.margin_top    =  2 // in mm
 settings.margin_right  = 12 // in mm
 settings.margin_bottom = 12 // in mm
-settings.margin_left   = 12 // in mm
+settings.margin_left   =  2 // in mm
 
 // Image size and resolution
-settings.image_width = 280 + settings.margin_left + settings.margin_right // in mm. Default: 200mm (fits in a A4 page)
-settings.image_height = 280 + settings.margin_top + settings.margin_bottom
-settings.output_dpi = 300 // Dots per inch.
-settings.rendering_dpi = 300 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
+settings.image_width = 304 // in mm. Default: 200mm (fits in a A4 page)
+settings.image_height = 171
+settings.output_dpi = 320.842 // Dots per inch.
+settings.rendering_dpi = 320.842 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
 
 // Tiling:
 // Tiling allows to build images that would be otherwise too large.
@@ -143,16 +143,16 @@ settings.node_fill_color = "#283535"
 // Layer: Node labels
 settings.label_color = "#283535"
 settings.label_color_from_node = true
-settings.label_count = 100
+settings.label_count = 50
 settings.label_max_length = 42 // Number of characters before truncate. Infinity is a valid value.
 settings.label_font_family = "Raleway"
-settings.label_font_min_size = 7.3 // in pt
-settings.label_font_max_size = 14  // in pt
-settings.label_font_thickness = .3
+settings.label_font_min_size = 6 // in pt
+settings.label_font_max_size = 12  // in pt
+settings.label_font_thickness = .28
 settings.label_border_thickness = .7 // in mm
 settings.label_spacing_offset = 1.5 // in mm (prevents label overlap)
 settings.label_border_color = "#FFFFFF"
-settings.label_curved_path = true // Curved labels
+settings.label_curved_path = false // Curved labels
 
 // Main clusters and color code:
 // Clusters are defined by the modalities of a given attribute.
@@ -170,7 +170,7 @@ settings.node_clusters = {
 settings.voronoi_range = 1.2 // Halo size in mm
 settings.voronoi_resolution_max = 1 * Math.pow(10, 7) // in pixel. 10^7 still quick, 10^8 better quality 
 settings.heatmap_resolution_max = 1 * Math.pow(10, 5) // in pixel. 10^5 quick. 10^7 nice but super slow.
-settings.heatmap_spreading = (settings.image_width - settings.margin_left - settings.margin_right) / 128 // in mm
+settings.heatmap_spreading = 1.5 // in mm
 
 // Experimental stuff
 settings.hillshading_strength = 36
@@ -3452,6 +3452,8 @@ newRenderer = function(){
       console.log("Rescale ratio: "+ratio)
     }
 
+    ratio = 0.42 // CUSTOM: we fix it so that it is constant from one map to another (since this is 4K with about the same number of nodes)
+    
     // Resize
     g.nodes().forEach(function(nid){
       var n = g.getNodeAttributes(nid)
@@ -3817,5 +3819,5 @@ newRenderer = function(){
 
 /// FINALLY, RENDER
 let renderer = newRenderer()
-renderer.renderAndSave(g, settings, 'Carto Twitter') // Custom
+renderer.renderAndSave(g, settings, 'Carto 4K top labels') // Custom
 // renderer.renderAndSaveAllTiles(g, settings)
