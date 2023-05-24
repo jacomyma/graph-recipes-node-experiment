@@ -5,18 +5,19 @@ const fs = require('fs');
 const { createCanvas, loadImage, ImageData } = require('canvas')
 const d3 = require('d3')
 
+const filename = "1010 Node halos - Voronoi node size"
+
 // Read file
 var gexf_string;
 try {
-    gexf_string = fs.readFileSync('data/network_spat.gexf', 'utf8');
-    // gexf_string = fs.readFileSync('data/test.gexf', 'utf8');
+    gexf_string = fs.readFileSync('data/airports.gexf', 'utf8');
     console.log('GEXF file loaded');    
 } catch(e) {
     console.log('Error:', e.stack);
 }
 
 // Parse string
-var g = gexf.parse(Graph, gexf_string, {addMissingNodes: true});
+var g = gexf.parse(Graph, gexf_string, {addMissingNodes:true});
 console.log('GEXF parsed');
 
 // Note about resolution:
@@ -24,24 +25,15 @@ console.log('GEXF parsed');
 // are up to 1480 x 5000 mm and 1440 or even 2880 dpi.
 // https://www.pixartprinting.fr/grand-format/impression-poster-haute-qualite/
 //
-// The script works (for me) eith 1000 x 1000 mm and 1440 dpi.
+// The script works (for me) with 1000 x 1000 mm and 1440 dpi.
 
 /// EDIT SETTINGS BELOW
 
 var settings = {}
 
-// Orientation & layout:
-settings.flip_x = false
-settings.flip_y = true
-settings.rotate = 0 // In degrees, clockwise
-settings.margin_top    = 24 // in mm
-settings.margin_right  = 24 // in mm
-settings.margin_bottom = 24 // in mm
-settings.margin_left   = 24 // in mm
-
 // Image size and resolution
-settings.image_width = 1600 // in mm. Default: 200mm (fits in a A4 page)
-settings.image_height = 1200
+settings.image_width = 1000 // in mm. Default: 200mm (fits in a A4 page)
+settings.image_height = 1000
 settings.output_dpi = 300 // Dots per inch.
 settings.rendering_dpi = 300 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
 
@@ -51,24 +43,33 @@ settings.rendering_dpi = 300 // Default: same as output_dpi. You can over- or un
 settings.tile_factor = 1 // Integer, default 1. Number of rows and columns of the grid of exported images.
 settings.tile_to_render = [0, 0] // Grid coordinates, as integers
 
+// Orientation & layout:
+settings.flip_x = false
+settings.flip_y = true
+settings.rotate = 0 // In degrees, clockwise
+settings.margin_top    =  6 // in mm
+settings.margin_right  =  6 // in mm
+settings.margin_bottom = 12 // in mm
+settings.margin_left   =  6 // in mm
+
 // Layers:
 // Decide which layers are drawn.
 // The settings for each layer are below.
 settings.draw_background            = true
-settings.draw_hillshading           = true
+settings.draw_hillshading           = false
 settings.draw_network_shape_fill    = false
 settings.draw_network_shape_contour = false
 settings.draw_cluster_fills         = false
 settings.draw_cluster_contours      = false
 settings.draw_cluster_labels        = false
-settings.draw_edges                 = false
-settings.draw_node_shadows          = true
-settings.draw_nodes                 = true
-settings.draw_node_labels           = true
+settings.draw_edges                 = true
+settings.draw_node_shadows          = false
+settings.draw_nodes                 = false
+settings.draw_node_labels           = false
 settings.draw_connected_closeness   = false
 
 // Layer: Background
-settings.background_color = "#fafaf7"
+settings.background_color = "#FFFFFF"
 
 // Layer: Connected-closeness
 settings.cc_text_color = "#283535"
@@ -95,7 +96,7 @@ settings.network_shape_contour_color = "#FFF"
 // Layer: Clusters
 //        (a potato per modality of target attribute)
 // ...generic structure
-settings.cluster_all_modalities = false // By default, we only use modalities specified in "node_clusters"
+settings.cluster_all_modalities = true // By default, we only use modalities specified in "node_clusters"
 settings.cluster_node_size_margin = 12 // In mm
 settings.cluster_shape_smoothness = 40 // In mm (underlying blur)
 settings.cluster_shape_size = 1 // Range: more than 0, default to 1.
@@ -120,39 +121,39 @@ settings.cluster_label_inner_color = "#ffffff" // Note: here color is on the bor
 
 // Layer: Edges
 settings.max_edge_count = Infinity
-settings.edge_thickness = 0.01 // in mm
-settings.edge_alpha = .25 // Opacity // Range from 0 to 1
-settings.edge_curved = true
-settings.edge_high_quality = true // Halo around nodes // Time-consuming
-settings.edge_color = "#6b7660"
-
-// Layer: Node shadows
-settings.node_color_shadow_offset = 6 // mm; larger than you'd think (gradient)
-settings.node_color_shadow_opacity = .5
-settings.node_color_shadow_blur_radius = 6 // mm
+settings.edge_alpha = 1 // Opacity // Range from 0 to 1
+settings.edge_thickness = 0.1
+settings.edge_curved = false
+settings.edge_high_quality = false // Halo around nodes // Time-consuming
+settings.edge_color = "#BBBBBB"
 
 // Layer: Nodes
 settings.adjust_voronoi_range = 100 // Factor // Larger node halo
-settings.node_size = 1. // Factor to adjust the nodes drawing size
-settings.node_color_original = true // Use the original node color
-settings.node_color_by_modalities = false // Use the modalities to color nodes (using settings.node_clusters)
-settings.node_stroke_width = 0.01 // mm
-settings.node_stroke_color = "#FFFFFF"
-settings.node_fill_color = "#283535"
+settings.node_size = 0.8 // Factor to adjust the nodes drawing size
+settings.node_color_original = false // Use the original node color
+settings.node_stroke_color = "#000000"
+settings.node_fill_color = "#000000"
+
+// Layer: Node shadows
+settings.node_color_shadow_offset = 18 // mm; larger than you'd think (gradient)
+settings.node_color_shadow_opacity = .3
+settings.node_color_shadow_blur_radius = 3 // mm
 
 // Layer: Node labels
-settings.label_color = "#283535"
-settings.label_color_from_node = true
-settings.label_count = 1500
-settings.label_max_length = 42 // Number of characters before truncate. Infinity is a valid value.
+settings.label_count = Infinity
+settings.label_color = "#000000"
+settings.label_color_from_node = false
+settings.label_max_length = 64 // Number of characters before truncate. Infinity is a valid value.
 settings.label_font_family = "Raleway"
-settings.label_font_min_size = 7 // in pt
-settings.label_font_max_size = 18  // in pt
-settings.label_font_thickness = .32
-settings.label_border_thickness = .7 // in mm
-settings.label_spacing_offset = 1.5 // in mm (prevents label overlap)
-settings.label_border_color = "#FFFFFF"
-settings.label_curved_path = true // Curved labels
+settings.label_font_min_size = 8 // in pt
+settings.label_font_max_size = 24  // in pt
+settings.label_font_thickness = .25
+settings.label_border_thickness = .8 // in mm
+settings.label_spacing_offset = 1 // in mm (prevents label overlap)
+settings.label_border_color = "#999999"
+settings.label_curved_path = false // Curved labels
+settings.label_path_starting_angle_range = 0 //Math.PI/4 // From 0 (horizontal) to PI (any angle)
+settings.label_path_step_angle_range = 0 // Math.PI/128 // From 0 (straight) to PI (any curvature)
 
 // Main clusters and color code:
 // Clusters are defined by the modalities of a given attribute.
@@ -160,39 +161,28 @@ settings.label_curved_path = true // Curved labels
 // modalities have which colors. You can generate this
 // JSON object with the PREPARE script.
 settings.node_clusters = {
-  "attribute_id": "couleur politique",
+  "attribute_id": "type",
   "modalities": {
   },
-  "default_color": "#afafac"
+  "default_color": "#787c79"
 }
 
 // Advanced settings
-settings.voronoi_range = 1.2 // Halo size in mm
-settings.voronoi_resolution_max = 1 * Math.pow(10, 7) // in pixel. 10^7 still quick, 10^8 better quality 
+settings.voronoi_range = 6 // DELETE ME 1.2 // Halo size in mm
+settings.voronoi_resolution_max = 1 * Math.pow(10, 8) // in pixel. 10^7 still quick, 10^8 better quality 
 settings.heatmap_resolution_max = 1 * Math.pow(10, 6) // in pixel. 10^5 quick. 10^7 nice but super slow.
-settings.heatmap_spreading = (settings.image_width - settings.margin_left - settings.margin_right) / 196 // in mm
+settings.heatmap_spreading = (settings.image_width - settings.margin_left - settings.margin_right) / 128 // in mm
 
 // Experimental stuff
-settings.hillshading_strength = 36
-settings.hillshading_color = "#494c55"
-settings.hillshading_alpha = .4 // Opacity
+settings.hillshading_strength = 32
+settings.hillshading_color = "#1B2529"
+settings.hillshading_alpha = .24 // Opacity
 settings.hillshading_sun_azimuth = Math.PI * 0.6 // angle in radians
-settings.hillshading_sun_elevation = Math.PI * 0.4 // angle in radians
-settings.hillshading_hypsometric_gradient = true // Elevation gradient color
+settings.hillshading_sun_elevation = Math.PI * 0.35 // angle in radians
+settings.hillshading_hypsometric_gradient = false // Elevation gradient color
 
 /// (END OF SETTINGS)
 
-// Custom modifications
-const regex = /[^A-zÀ-ÿ0-9 '\-#&]*/gi;
-g.nodes().forEach(nid => {
-  let n = g.getNodeAttributes(nid)
-  n.label = (n.label || n.Label || '').replace(regex, '').trim()
-})
-// For shadow
-g.nodes().forEach(nid => {
-  let n = g.getNodeAttributes(nid)
-  n.drawShadow = n.colored == "yes"
-})
 
 /// RENDERER
 var newRenderer
@@ -215,53 +205,75 @@ newRenderer = function(){
     var bgImage = ns.getEmptyLayer(true)
     var layeredImage = ns.getEmptyLayer(true)
 
+    /// BG image (edges and labels)
+    let bgSettings = {...ns.settings}
+    bgSettings.label_color = "#999999"
+    bgSettings.label_border_color = "#FFFFFF"
+    bgSettings.node_stroke_color = "#FFFFFF"
+    bgSettings.node_fill_color = "#FFFFFF"
+    
     // Draw background
-    if (ns.settings.draw_background) {
+    bgImage = ns.drawLayerOnTop(bgImage,
+      ns.drawBackgroundLayer(bgSettings)
+    )
+
+    // Draw edges
+    if (ns.settings.draw_edges) {
       bgImage = ns.drawLayerOnTop(bgImage,
-        ns.drawBackgroundLayer(ns.settings)
+        ns.drawEdgesLayer(bgSettings)
       )
     }
 
-    // Draw Hillshading
-    if (ns.settings.draw_hillshading) {
+    // Draw labels
+    if (ns.settings.draw_node_labels) {
       bgImage = ns.drawLayerOnTop(bgImage,
-        ns.drawHillshadingGradient(ns.settings)
-      )
-    }
-
-    // Draw network shape fill
-    if (ns.settings.draw_network_shape_fill) {
-      bgImage = ns.drawLayerOnTop(bgImage,
-        ns.drawNetworkShapeFillLayer(ns.settings)
-      )
-    }
-
-    // Draw network shape contour
-    if (ns.settings.draw_network_shape_contour) {
-      bgImage = ns.drawLayerOnTop(layeredImage,
-        ns.drawNetworkShapeContourLayer(ns.settings)
+        ns.drawNodeLabelsLayer(bgSettings)
       )
     }
 
     // Draw node shadows
     if (ns.settings.draw_node_shadows) {
       bgImage = ns.overlayLayer(bgImage,
-        ns.drawNodesShadowLayer(ns.settings),
+        ns.drawNodesShadowLayer(bgSettings),
+        "multiply"
+      )
+    }
+
+    // Draw Hillshading
+    if (ns.settings.draw_hillshading) {
+      bgImage = ns.overlayLayer(bgImage,
+        ns.drawHillshadingGradient(bgSettings),
         "multiply"
       )
     }
     
-    // Draw edges
-    if (ns.settings.draw_edges) {
-      layeredImage = ns.drawLayerOnTop(layeredImage,
-        ns.drawEdgesLayer(ns.settings)
+    // Draw nodes
+    if (ns.settings.draw_nodes) {
+      bgImage = ns.drawLayerOnTop(bgImage,
+        ns.drawNodesLayer(bgSettings)
       )
     }
 
-    // Draw nodes
-    if (ns.settings.draw_nodes) {
+    /// DRAW TOP LAYER
+
+    // Draw background
+    if (ns.settings.draw_background) {
       layeredImage = ns.drawLayerOnTop(layeredImage,
-        ns.drawNodesLayer(ns.settings)
+        ns.drawBackgroundLayer(ns.settings)
+      )
+    }
+
+    // Draw network shape fill
+    if (ns.settings.draw_network_shape_fill) {
+      layeredImage = ns.drawLayerOnTop(layeredImage,
+        ns.drawNetworkShapeFillLayer(ns.settings)
+      )
+    }
+
+    // Draw network shape contour
+    if (ns.settings.draw_network_shape_contour) {
+      layeredImage = ns.drawLayerOnTop(layeredImage,
+        ns.drawNetworkShapeContourLayer(ns.settings)
       )
     }
 
@@ -272,12 +284,34 @@ newRenderer = function(){
       )
     }
 
+    // Draw nodes
+    if (ns.settings.draw_nodes) {
+      layeredImage = ns.drawLayerOnTop(layeredImage,
+        ns.drawNodesLayer(ns.settings)
+      )
+    }
+
+    let maskImage = ns.getEmptyLayer()
+    maskImage.data.set(new Uint8ClampedArray(layeredImage.data))
+
     // Draw node labels
     if (ns.settings.draw_node_labels) {
       layeredImage = ns.drawLayerOnTop(layeredImage,
         ns.drawNodeLabelsLayer(ns.settings)
       )
     }
+
+    // Overlay mask
+    layeredImage = ns.overlayLayer(layeredImage,
+      maskImage,
+      "screen"
+    )
+    
+    // Composite with background
+    layeredImage = ns.overlayLayer(bgImage,
+      layeredImage,
+      "multiply"
+    )
 
     // Draw connected-closeness
     if (ns.settings.draw_connected_closeness) {
@@ -307,13 +341,6 @@ newRenderer = function(){
         ns.drawClusterLabelsLayer(ns.settings)
       )
     }
-
-    // Merge on background
-    layeredImage = ns.overlayLayer(
-      bgImage,
-      layeredImage,
-      "multiply"
-    )
 
     // Build final canvas
     var renderingCanvas = ns.createCanvas()
@@ -511,7 +538,7 @@ newRenderer = function(){
       return ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
     } else {
       if (options.hillshading_hypsometric_gradient) {
-        let mid_threshold = 0.2
+        let mid_threshold = 0.18
         ns.log2("Draw hypsometric gradient...")
         let colorGradient = d3.scaleLinear()
           .domain([0, mid_threshold*0.8, mid_threshold*1.2, 1])
@@ -695,7 +722,6 @@ newRenderer = function(){
         for (y = 0; y <= height; y++ ){
           i = x + (width+1) * y
           d = Math.sqrt(Math.pow(nx - x, 2) + Math.pow(ny - y, 2))
-          d = Math.max(0, d-nsize) // In test
           h = 1 / (1+Math.pow(d/spread, 2))
           hPixelMap[i] = hPixelMap[i] + h
         }
@@ -767,13 +793,13 @@ newRenderer = function(){
     var southWestPoint = {x: margin_left, y:dim.h-margin_bottom}
     var westPoint = {x: southWestPoint.x, y: centerPoint.y}
     var southPoint = {x: centerPoint.x, y:southWestPoint.y}
-    var lineHeight = ns.pt_to_px(options.cc_font_size)
+    var lineHeight = ns.pt_to_pt(options.cc_font_size)
 
     if (C_max >= options.C_max_threshold) {
 
       // Draw the scale
       drawScaleV(ctx, westPoint.x+lineThickness/2, westPoint.y, Delta_max);
-      drawText(ctx, 'Δmax', westPoint.x+lineThickness/2 + ns.mm_to_px(.5) + textThickness, westPoint.y + 0.4*ns.pt_to_px(options.cc_font_size), "start");
+      drawText(ctx, 'Δmax', westPoint.x+lineThickness/2 + ns.mm_to_px(.5) + textThickness, westPoint.y + 0.4*ns.pt_to_pt(options.cc_font_size), "start");
 
       drawScaleH(ctx, southPoint.x, southPoint.y-lineThickness/2, Delta_max);
       drawText(ctx, 'Δmax', southPoint.x, southPoint.y-lineThickness/2 - textThickness, "center");
@@ -858,7 +884,7 @@ newRenderer = function(){
     // Internal methods
     function drawText(ctx, txt, x, y, textAlign) {
       ctx.textAlign = textAlign || "start";
-      ctx.font = ns.buildContextFontString(options.cc_font_weight, ns.pt_to_px(options.cc_font_size), options.cc_font_family)
+      ctx.font = ns.buildContextFontString(options.cc_font_weight, ns.pt_to_pt(options.cc_font_size), options.cc_font_family)
       ctx.lineWidth = textThickness;
       ctx.fillStyle = options.cc_text_border_color;
       ctx.strokeStyle = options.cc_text_border_color;
@@ -1296,7 +1322,7 @@ newRenderer = function(){
     ns.scaleContext(ctx)
 
     var clusterImprint = clusterImprints[modality]
-    
+
     const path = d3.geoPath(null, ctx)
     ctx.lineCap = "round"
     ctx.lineJoin = "round"
@@ -1588,7 +1614,7 @@ newRenderer = function(){
 
       // Precompute the label
       var count = nodeCountByModality[modality]
-      var fontSize = ns.pt_to_px( options.cluster_label_sized
+      var fontSize = ns.pt_to_pt( options.cluster_label_sized
         ? Math.floor(options.cluster_label_font_min_size + (count - label_clusterSizeExtent[0]) * (options.cluster_label_font_max_size - options.cluster_label_font_min_size) / (label_clusterSizeExtent[1] - label_clusterSizeExtent[0]))
         : Math.floor(0.8 * options.cluster_label_font_min_size + 0.2 * options.cluster_label_font_max_size)
       )
@@ -1657,7 +1683,7 @@ newRenderer = function(){
     return ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
   }
 
-  ns.getNormalizeFontSize = function(options, bolder) {
+  ns.getNormalizeFontSize = function(options) {
     options = options || {}
     options.label_font_thickness = options.label_font_thickness || .3 // In mm
 
@@ -1672,12 +1698,6 @@ newRenderer = function(){
 
     // We restrain the size to the proper steps of the scale
     var text_thickness = ns.mm_to_px(options.label_font_thickness)
-
-    // Custom: bolder
-    if (bolder) {
-      text_thickness *= 2
-    }
-
     var normalizeFontSize = function(size) {
       // The target thickness is the pen size, which is fixed: text_thickness
       // But to compute the weight, we must know the thickness for a standard size: 1
@@ -1700,9 +1720,9 @@ newRenderer = function(){
   ns.tuneColorForLabel = function(c) {
     var options = {}
     options.label_color_min_C = 0
-    options.label_color_max_C = 70
+    options.label_color_max_C = 50
     options.label_color_min_L = 2
-    options.label_color_max_L = 50
+    options.label_color_max_L = 35
     var hcl = d3.hcl(c)
     hcl.c = Math.max(hcl.c, options.label_color_min_C)
     hcl.c = Math.min(hcl.c, options.label_color_max_C)
@@ -1736,7 +1756,7 @@ newRenderer = function(){
     options.label_path_downhill = true
     options.label_path_center = false
     options.label_path_starting_angle_range = Math.PI/2 // From 0 (horizontal) to PI (any angle)
-    options.label_path_step_angle_range = 0.33 // Curvature per font size. 0 is straight.
+    options.label_path_step_angle_range = Math.PI/64 // From 0 (straight) to PI (any curvature)
 
     var g = ns.g
     var dim = ns.getRenderingPixelDimensions()
@@ -1753,7 +1773,6 @@ newRenderer = function(){
     var labelsStack = []
     var borderThickness = ns.mm_to_px(options.label_border_thickness)
     var labelPaths = (options.label_curved_path)?(ns.getLabelPaths(options)):(false)
-    let drawnMinFontSize = Infinity
     visibleLabels.forEach(function(nid){
 
       var n = g.getNodeAttributes(nid)
@@ -1768,11 +1787,8 @@ newRenderer = function(){
       }
 
       // Precompute the label
-      ctx.font = ns.buildLabelFontContext(options, n.size, n.important) // Custom: important
+      ctx.font = ns.buildLabelFontContext(options, n.size)
       var fontSize = +ctx.font.split('px')[0]
-      if (!isNaN(fontSize)) {
-        drawnMinFontSize = Math.min(drawnMinFontSize, fontSize)
-      }
 
       // Then, draw the label only if wanted
       var radius = Math.max(options.node_size * n.size, 2)
@@ -1840,7 +1856,6 @@ newRenderer = function(){
       }
     })
 
-    console.log("FONT SIZE MIN (DRAWN) (pt): ", ns.px_to_pt(drawnMinFontSize))
     ns.report("...done.")
     return ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
   }
@@ -1863,15 +1878,15 @@ newRenderer = function(){
     return nodeSizeExtent
   }
 
-  ns.buildLabelFontContext = function(options, node_size, bolder) { // Custom: bolder
+  ns.buildLabelFontContext = function(options, node_size) {
     var nodeSizeExtent = ns.getNodeSizeExtent()
-    var fontSize = ns.pt_to_px( options.sized_labels
+    var fontSize = ns.pt_to_pt( options.sized_labels
       ? Math.floor(options.label_font_min_size + (node_size - nodeSizeExtent[0]) * (options.label_font_max_size - options.label_font_min_size) / (nodeSizeExtent[1] - nodeSizeExtent[0]))
       : Math.floor(0.8 * options.label_font_min_size + 0.2 * options.label_font_max_size)
     )
     
     // sw: Size and weight
-    var normalizeFontSize = ns.getNormalizeFontSize(options, bolder) // Custom: bolder
+    var normalizeFontSize = ns.getNormalizeFontSize(options)
     var sw = normalizeFontSize(fontSize)
     if (!options.true_size) {
       fontSize = sw[0]
@@ -1916,7 +1931,7 @@ newRenderer = function(){
     options.label_path_monitor_field = false
     options.label_path_monitor = false
     options.node_size = (options.node_size===undefined)?(1):(options.node_size)
-    options.label_node_space_ratio = 0.08 // ratio of node size
+    options.label_node_space_ratio = 0.05 // ratio of node size
 
     // Cache
     if (ns._labelPaths) {
@@ -2070,10 +2085,8 @@ newRenderer = function(){
       }
 
       var label = ns.tuneLabelString(n.label, options)
-      ctx.font = ns.buildLabelFontContext(options, n.size, n.important) // Custom: important
-      let fontSize = +ctx.font.replace('bold ', '').split('px')[0]
-      let maxCurvature = options.label_path_step_angle_range / ns.px_to_pt(fontSize)
-
+      ctx.font = ns.buildLabelFontContext(options, n.size)
+      
       // Let's get the label length
       var labelLength = ctx.measureText(label).width
 
@@ -2084,24 +2097,20 @@ newRenderer = function(){
       // Set the central segment
       var i = Math.floor(nx*settings.tile_factor) + Math.floor(ny*settings.tile_factor)*dim.w*ns.settings.tile_factor
       originalAngle = Math.atan2(dyPixelMap[i], dxPixelMap[i])
-      if (n.labelStartAngle !== undefined) {
-        angle = -n.labelStartAngle // The minus sign is to stick to the trigonometric convention for the label
+      if (options.label_path_downhill) {
+        angle = Math.atan2(dyPixelMap[i], dxPixelMap[i])
       } else {
-        if (options.label_path_downhill) {
-          angle = Math.atan2(dyPixelMap[i], dxPixelMap[i])
-        } else {
-          angle = Math.atan2(dxPixelMap[i], -dyPixelMap[i])
-        }
-        // Note: angle is in [-PI, PI] at this stage
-        if (Math.PI/2 < angle && angle < Math.PI - options.label_path_starting_angle_range/2) {
-          angle = Math.PI - options.label_path_starting_angle_range/2
-        } else if (options.label_path_starting_angle_range/2 < angle && angle < Math.PI/2 ) {
-          angle = options.label_path_starting_angle_range/2
-        } else if (-Math.PI/2 < angle && angle < -options.label_path_starting_angle_range/2 ) {
-          angle = -options.label_path_starting_angle_range/2
-        } else if (-Math.PI + options.label_path_starting_angle_range/2 < angle && angle < -Math.PI/2 ) {
-          angle = -Math.PI + options.label_path_starting_angle_range/2
-        }
+        angle = Math.atan2(dxPixelMap[i], -dyPixelMap[i])
+      }
+      // Note: angle is in [-PI, PI] at this stage
+      if (Math.PI/2 < angle && angle < Math.PI - options.label_path_starting_angle_range/2) {
+        angle = Math.PI - options.label_path_starting_angle_range/2
+      } else if (options.label_path_starting_angle_range/2 < angle && angle < Math.PI/2 ) {
+        angle = options.label_path_starting_angle_range/2
+      } else if (-Math.PI/2 < angle && angle < -options.label_path_starting_angle_range/2 ) {
+        angle = -options.label_path_starting_angle_range/2
+      } else if (-Math.PI + options.label_path_starting_angle_range/2 < angle && angle < -Math.PI/2 ) {
+        angle = -Math.PI + options.label_path_starting_angle_range/2
       }
 
       var initAngle = angle
@@ -2128,10 +2137,10 @@ newRenderer = function(){
         while (angleDiff > Math.PI) {
           angleDiff -= 2*Math.PI
         }
-        if (angleDiff > maxCurvature) {
-          angleDiff = maxCurvature
-        } else if (angleDiff < -maxCurvature) {
-          angleDiff = -maxCurvature
+        if (angleDiff > options.label_path_step_angle_range) {
+          angleDiff = options.label_path_step_angle_range
+        } else if (angleDiff < -options.label_path_step_angle_range) {
+          angleDiff = -options.label_path_step_angle_range
         }
         angle = lastAngle + angleDiff
         path.push([point[0]+step_length*Math.cos(angle), point[1]+step_length*Math.sin(angle), originalAngle])
@@ -2158,10 +2167,10 @@ newRenderer = function(){
           while (angleDiff > Math.PI) {
             angleDiff -= 2*Math.PI
           }
-          if (angleDiff > maxCurvature) {
-            angleDiff = maxCurvature
-          } else if (angleDiff < -maxCurvature) {
-            angleDiff = -maxCurvature
+          if (angleDiff > options.label_path_step_angle_range) {
+            angleDiff = options.label_path_step_angle_range
+          } else if (angleDiff < -options.label_path_step_angle_range) {
+            angleDiff = -options.label_path_step_angle_range
           }
           angle = lastAngle + angleDiff
           path.unshift([point[0]-step_length*Math.cos(angle), point[1]-step_length*Math.sin(angle), originalAngle])
@@ -2224,7 +2233,6 @@ newRenderer = function(){
 
     options = options || {}
     options.label_collision_pixmap_max_resolution = options.label_collision_pixmap_max_resolution || 10000000 // 10 megapixel
-    options.label_collision_include_node = true
     // For monitoring
     options.download_image = false // For monitoring the process
 
@@ -2266,16 +2274,15 @@ newRenderer = function(){
     // Evaluate labels
     var labelDrawCount = options.label_count
     var offset = ns.mm_to_px(options.label_spacing_offset)
-    var stroke_width = ns.mm_to_px(options.node_stroke_width || 0)
     var count = 0
     nodesBySize
     .forEach(function(nid){
-      var n = g.getNodeAttributes(nid)
-      if (labelDrawCount > 0 || n.important) { // Custom: important
+      if (labelDrawCount > 0) {
+        var n = g.getNodeAttributes(nid)
         var nx = n.x
         var ny = n.y
 
-        ctx.font = ns.buildLabelFontContext(options, n.size, n.important) // Custom: important
+        ctx.font = ns.buildLabelFontContext(options, n.size)
         var fontSize = +ctx.font.replace('bold ', '').split('px')[0]
         var label = ns.tuneLabelString(n.label, options)
 
@@ -2369,10 +2376,10 @@ newRenderer = function(){
           }
         } else {
           collision = true
-          // console.log("Warning: path of length 0 for "+nid+" ("+label+"):")
+          console.log("Warning: path of length 0 for "+nid+" ("+label+"):")
         }
 
-        if (!collision || n.important) { // Custom: important
+        if (!collision) {
           // Draw the bounding area on that canvas
           ctx.strokeStyle = '#FFF'
           ctx.lineCap = 'round';
@@ -2389,16 +2396,6 @@ newRenderer = function(){
             ctx.lineTo(x, y)
           }
           ctx.stroke()
-
-          // Draw the node itself if needed
-          if (options.label_collision_include_node) {
-            var radius = Math.max(options.node_size * n.size, stroke_width)
-            ctx.beginPath()
-            ctx.arc(n.x, n.y, radius - 0.5*stroke_width, 0, 2 * Math.PI, false)
-            ctx.lineWidth = 0
-            ctx.fillStyle = '#FFF'
-            ctx.fill()
-          }
 
           // Update count
           labelDrawCount--
@@ -2609,8 +2606,8 @@ newRenderer = function(){
     options.edge_path_jitter = (options.edge_path_jitter === undefined)?(0.00):(options.edge_path_jitter) // in mm
     options.edge_path_segment_length = options.edge_high_quality?.2:2 // in mm
     // Monitoring options
-    options.display_voronoi = false // for monitoring purpose
-    options.display_edges = true // disable for monitoring purpose
+    options.display_voronoi = true // for monitoring purpose
+    options.display_edges = false // disable for monitoring purpose
 
     var g = ns.g
     var dim = ns.getRenderingPixelDimensions()
@@ -2618,6 +2615,7 @@ newRenderer = function(){
     ns.scaleContext(ctx)
 
     var gradient = function(d){
+      return d // DELETE ME
       return Math.round(10000*
         (0.5 + 0.5 * Math.cos(Math.PI - Math.pow(d, 2) * Math.PI))
       )/10000
@@ -2709,7 +2707,7 @@ newRenderer = function(){
     }
 
     // Draw each edge
-    // var color = d3.color(options.edge_color) // Custom. See below: edges colored as their target
+    var color = d3.color(options.edge_color)
     var thickness = ns.mm_to_px(options.edge_thickness)
     var jitter = ns.mm_to_px(options.edge_path_jitter)
     var tf = ns.settings.tile_factor
@@ -2720,8 +2718,6 @@ newRenderer = function(){
       g.edges()
         .filter(function(eid, i_){ return i_ < options.max_edge_count })
         .forEach(function(eid, i_){
-          // Custom: edge colored as target
-          var color = d3.color(ns.getNodeColor(options, g.getNodeAttributes(g.target(eid))))
           if ((i_+1)%10000 == 0) {
             console.log("..."+(i_+1)/1000+"K edges drawn...")
           }
@@ -2729,7 +2725,7 @@ newRenderer = function(){
           var n_t = g.getNodeAttributes(g.target(eid))
           var path, i, x, y, o, dpixi, lastdpixi, lasto, pixi, pi
           var edgeOpacity = (g.getEdgeAttribute(eid, 'opacity')===undefined)?(1.):(g.getEdgeAttribute(eid, 'opacity'))
-
+          var edgeThickness = thickness * ((g.getEdgeAttribute(eid, 'weight')===undefined)?(1.):(g.getEdgeAttribute(eid, 'weight')))
           // Build path
           var d = Math.sqrt(Math.pow(n_s.x - n_t.x, 2) + Math.pow(n_s.y - n_t.y, 2))
           var angle = Math.atan2( n_t.y - n_s.y, n_t.x - n_s.x )
@@ -2812,7 +2808,7 @@ newRenderer = function(){
             o = path[i+2]/255
 
             if (lastx) {
-              ctx.lineWidth = thickness * (0.9 + 0.2*Math.random())
+              ctx.lineWidth = edgeThickness * (0.9 + 0.2*Math.random())
               color.opacity = edgeOpacity*(lasto+o)/2
               ctx.beginPath()
               ctx.strokeStyle = color.toString()
@@ -2852,14 +2848,6 @@ newRenderer = function(){
     nodesBySize.sort(function(naid, nbid){
       var na = g.getNodeAttributes(naid)
       var nb = g.getNodeAttributes(nbid)
-      
-      // Custom (important)
-      if (na.important) {
-        return -1
-      } else if (nb.important) {
-        return 1
-      }
-
       if ( na.size < nb.size ) {
         return 1
       } else if ( na.size > nb.size ) {
@@ -3078,33 +3066,31 @@ newRenderer = function(){
         var progress = 1-steps/totalSteps
         var layerOpacity = gradient(progress)
         
-        ns.getNodesBySize()
-          .filter(nid => g.getNodeAttribute(nid, 'drawShadow')) // Custom filter
-          .forEach(function(nid){
-            var n = g.getNodeAttributes(nid)
+        ns.getNodesBySize().forEach(function(nid){
+          var n = g.getNodeAttributes(nid)
 
-            // Color
-            var color = d3.color(ns.getNodeColor(options, n))
+          // Color
+          var color = d3.color(ns.getNodeColor(options, n))
 
-            // Tune the color to be a bit more vivid, a bit less dark
-            var hsl = d3.hsl(color)
-            hsl.l = Math.min(1, hsl.l * 1.2)
-            hsl.s = Math.min(1, hsl.s * 1.1)
+          // Tune the color to be a bit more vivid, a bit less dark
+          var hsl = d3.hsl(color)
+          hsl.l = Math.min(1, hsl.l * 1.2)
+          hsl.s = Math.min(1, hsl.s * 1.1)
 
-            // Bluriness (actually whiteness)
-            hsl.l = (1-layerOpacity)*1 + layerOpacity*hsl.l
+          // Bluriness (actually whiteness)
+          hsl.l = (1-layerOpacity)*1 + layerOpacity*hsl.l
 
-            color = d3.color(hsl)
-            
-            color.opacity = .5 // Blending
+          color = d3.color(hsl)
+          
+          color.opacity = .5 // Blending
 
-            var radius = radiusRatio * options.node_size * n.size + radiusOffset
+          var radius = radiusRatio * options.node_size * n.size + radiusOffset
 
-            ctx.fillStyle = color.toString()
-            ctx.beginPath()
-            ctx.arc(n.x, n.y, radius, 0, 2 * Math.PI, false)
-            ctx.fill()
-          })
+          ctx.fillStyle = color.toString()
+          ctx.beginPath()
+          ctx.arc(n.x, n.y, radius, 0, 2 * Math.PI, false)
+          ctx.fill()
+        })
       }
 
       // Blur
@@ -3577,12 +3563,8 @@ newRenderer = function(){
     return d * ns.settings.rendering_dpi * 0.0393701 / ns.settings.tile_factor
   }
 
-  ns.pt_to_px = function(d) {
+  ns.pt_to_pt = function(d) {
     return Math.round(1000 * d * ns.settings.rendering_dpi / ( 72 * ns.settings.tile_factor )) / 1000
-  }
-
-  ns.px_to_pt = function(d) {
-    return Math.round(1000 * d * ( 72 * ns.settings.tile_factor ) / ns.settings.rendering_dpi) / 1000
   }
 
   ns.downloadImageData = function(imgd, name) {
@@ -3817,5 +3799,5 @@ newRenderer = function(){
 
 /// FINALLY, RENDER
 let renderer = newRenderer()
-renderer.renderAndSave(g, settings, 'Carto Large') // Custom
+renderer.renderAndSave(g, settings, filename)
 // renderer.renderAndSaveAllTiles(g, settings)

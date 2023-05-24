@@ -8,15 +8,14 @@ const d3 = require('d3')
 // Read file
 var gexf_string;
 try {
-    gexf_string = fs.readFileSync('data/network_spat.gexf', 'utf8');
-    // gexf_string = fs.readFileSync('data/test.gexf', 'utf8');
+    gexf_string = fs.readFileSync('data/02 largest_component_scopus_7500 fix spat + color infomap.gexf', 'utf8');
     console.log('GEXF file loaded');    
 } catch(e) {
     console.log('Error:', e.stack);
 }
 
 // Parse string
-var g = gexf.parse(Graph, gexf_string, {addMissingNodes: true});
+var g = gexf.parse(Graph, gexf_string, {addMissingNodes:true});
 console.log('GEXF parsed');
 
 // Note about resolution:
@@ -24,26 +23,18 @@ console.log('GEXF parsed');
 // are up to 1480 x 5000 mm and 1440 or even 2880 dpi.
 // https://www.pixartprinting.fr/grand-format/impression-poster-haute-qualite/
 //
-// The script works (for me) eith 1000 x 1000 mm and 1440 dpi.
+// The script works (for me) with 1000 x 1000 mm and 1440 dpi.
 
 /// EDIT SETTINGS BELOW
 
 var settings = {}
 
-// Orientation & layout:
-settings.flip_x = false
-settings.flip_y = true
-settings.rotate = 0 // In degrees, clockwise
-settings.margin_top    = 24 // in mm
-settings.margin_right  = 24 // in mm
-settings.margin_bottom = 24 // in mm
-settings.margin_left   = 24 // in mm
-
 // Image size and resolution
-settings.image_width = 1600 // in mm. Default: 200mm (fits in a A4 page)
-settings.image_height = 1200
-settings.output_dpi = 300 // Dots per inch.
-settings.rendering_dpi = 300 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
+let wiggleMargin = 50
+settings.image_width = 1000+2*wiggleMargin // in mm. Default: 200mm (fits in a A4 page)
+settings.image_height = 1000+2*wiggleMargin
+settings.output_dpi = 450 // Dots per inch.
+settings.rendering_dpi = 450 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
 
 // Tiling:
 // Tiling allows to build images that would be otherwise too large.
@@ -51,24 +42,34 @@ settings.rendering_dpi = 300 // Default: same as output_dpi. You can over- or un
 settings.tile_factor = 1 // Integer, default 1. Number of rows and columns of the grid of exported images.
 settings.tile_to_render = [0, 0] // Grid coordinates, as integers
 
+// Orientation & layout:
+settings.flip_x = false
+settings.flip_y = true
+settings.rotate = 0 // In degrees, clockwise
+settings.margin_top    = wiggleMargin + 50 // in mm
+settings.margin_right  = wiggleMargin + 50 // in mm
+settings.margin_bottom = wiggleMargin + 50 // in mm
+settings.margin_left   = wiggleMargin + 50 // in mm
+
 // Layers:
 // Decide which layers are drawn.
 // The settings for each layer are below.
 settings.draw_background            = true
-settings.draw_hillshading           = true
+settings.draw_hillshading           = false
 settings.draw_network_shape_fill    = false
 settings.draw_network_shape_contour = false
 settings.draw_cluster_fills         = false
 settings.draw_cluster_contours      = false
 settings.draw_cluster_labels        = false
 settings.draw_edges                 = false
-settings.draw_node_shadows          = true
+settings.draw_node_shadows          = false
 settings.draw_nodes                 = true
-settings.draw_node_labels           = true
+settings.draw_node_labels           = false
 settings.draw_connected_closeness   = false
+settings.draw_polygons              = false//true // Custom!
 
 // Layer: Background
-settings.background_color = "#fafaf7"
+settings.background_color = "#FFFFFF"
 
 // Layer: Connected-closeness
 settings.cc_text_color = "#283535"
@@ -95,7 +96,7 @@ settings.network_shape_contour_color = "#FFF"
 // Layer: Clusters
 //        (a potato per modality of target attribute)
 // ...generic structure
-settings.cluster_all_modalities = false // By default, we only use modalities specified in "node_clusters"
+settings.cluster_all_modalities = true // By default, we only use modalities specified in "node_clusters"
 settings.cluster_node_size_margin = 12 // In mm
 settings.cluster_shape_smoothness = 40 // In mm (underlying blur)
 settings.cluster_shape_size = 1 // Range: more than 0, default to 1.
@@ -119,40 +120,41 @@ settings.cluster_label_border_thickness = 1.6 // In mm
 settings.cluster_label_inner_color = "#ffffff" // Note: here color is on the border
 
 // Layer: Edges
-settings.max_edge_count = Infinity
-settings.edge_thickness = 0.01 // in mm
-settings.edge_alpha = .25 // Opacity // Range from 0 to 1
-settings.edge_curved = true
+settings.edge_thickness = .06 // in mm
+settings.edge_alpha = .33 // Opacity // Range from 0 to 1
+settings.edge_curved = false
 settings.edge_high_quality = true // Halo around nodes // Time-consuming
 settings.edge_color = "#6b7660"
 
 // Layer: Node shadows
-settings.node_color_shadow_offset = 6 // mm; larger than you'd think (gradient)
-settings.node_color_shadow_opacity = .5
-settings.node_color_shadow_blur_radius = 6 // mm
+settings.node_color_shadow_offset = 18 // mm; larger than you'd think (gradient)
+settings.node_color_shadow_opacity = .3
+settings.node_color_shadow_blur_radius = 3 // mm
 
 // Layer: Nodes
 settings.adjust_voronoi_range = 100 // Factor // Larger node halo
-settings.node_size = 1. // Factor to adjust the nodes drawing size
-settings.node_color_original = true // Use the original node color
+settings.node_size = 1.05 // Factor to adjust the nodes drawing size
+settings.node_color_original = false // Use the original node color
 settings.node_color_by_modalities = false // Use the modalities to color nodes (using settings.node_clusters)
 settings.node_stroke_width = 0.01 // mm
 settings.node_stroke_color = "#FFFFFF"
-settings.node_fill_color = "#283535"
+settings.node_fill_color = "#000000"
 
 // Layer: Node labels
-settings.label_color = "#283535"
-settings.label_color_from_node = true
-settings.label_count = 1500
+settings.label_color = "#697282"//"#283535"
+settings.label_color_from_node = false
+settings.label_count = 500
 settings.label_max_length = 42 // Number of characters before truncate. Infinity is a valid value.
 settings.label_font_family = "Raleway"
-settings.label_font_min_size = 7 // in pt
-settings.label_font_max_size = 18  // in pt
-settings.label_font_thickness = .32
-settings.label_border_thickness = .7 // in mm
+settings.label_font_min_size = 5 // in pt
+settings.label_font_max_size = 10  // in pt
+settings.label_font_thickness = .2
+settings.label_border_thickness = .8 // in mm
 settings.label_spacing_offset = 1.5 // in mm (prevents label overlap)
 settings.label_border_color = "#FFFFFF"
 settings.label_curved_path = true // Curved labels
+settings.label_path_starting_angle_range = Math.PI/4 // From 0 (horizontal) to PI (any angle)
+settings.label_path_step_angle_range = Math.PI/128 // From 0 (straight) to PI (any curvature)
 
 // Main clusters and color code:
 // Clusters are defined by the modalities of a given attribute.
@@ -160,39 +162,97 @@ settings.label_curved_path = true // Curved labels
 // modalities have which colors. You can generate this
 // JSON object with the PREPARE script.
 settings.node_clusters = {
-  "attribute_id": "couleur politique",
+  "attribute_id": "type",
   "modalities": {
   },
-  "default_color": "#afafac"
+  "default_color": "#787c79"
 }
 
 // Advanced settings
 settings.voronoi_range = 1.2 // Halo size in mm
-settings.voronoi_resolution_max = 1 * Math.pow(10, 7) // in pixel. 10^7 still quick, 10^8 better quality 
+settings.voronoi_resolution_max = 1 * Math.pow(10, 8) // in pixel. 10^7 still quick, 10^8 better quality 
 settings.heatmap_resolution_max = 1 * Math.pow(10, 6) // in pixel. 10^5 quick. 10^7 nice but super slow.
-settings.heatmap_spreading = (settings.image_width - settings.margin_left - settings.margin_right) / 196 // in mm
+settings.heatmap_spreading = (settings.image_width - settings.margin_left - settings.margin_right) / 140 // in mm
 
 // Experimental stuff
-settings.hillshading_strength = 36
-settings.hillshading_color = "#494c55"
-settings.hillshading_alpha = .4 // Opacity
+settings.hillshading_strength = 40
+settings.hillshading_color = "#1B2529"
+settings.hillshading_alpha = .36 // Opacity
 settings.hillshading_sun_azimuth = Math.PI * 0.6 // angle in radians
-settings.hillshading_sun_elevation = Math.PI * 0.4 // angle in radians
+settings.hillshading_sun_elevation = Math.PI * 0.35 // angle in radians
 settings.hillshading_hypsometric_gradient = true // Elevation gradient color
 
 /// (END OF SETTINGS)
 
-// Custom modifications
-const regex = /[^A-zÀ-ÿ0-9 '\-#&]*/gi;
+
+/// CUSTOM SHIT
+
+// Assume weights and positive ones:
+// Normalize to [0, 1]
+let wMax = 0
+g.edges().forEach(eid => {
+  let w = g.getEdgeAttribute(eid, 'weight')
+  wMax = Math.max(wMax, w)
+})
+g.edges().forEach(eid => {
+  let e = g.getEdgeAttributes(eid)
+  e.weight = e.weight / wMax
+})
+
+// Only show some labels
 g.nodes().forEach(nid => {
   let n = g.getNodeAttributes(nid)
-  n.label = (n.label || n.Label || '').replace(regex, '').trim()
+  n.label = n.label.replace("_", " ")
+  // n.showLabel = n.showname == 1
+  n.showLabel = true
 })
-// For shadow
-g.nodes().forEach(nid => {
-  let n = g.getNodeAttributes(nid)
-  n.drawShadow = n.colored == "yes"
-})
+
+// Basemap polygons!
+var basemapPolygons = [
+    [ // Radiotherapy
+      [-791,3851],[-636,3494],[-574,2967],[-698,2765],[-1009,2687],[-1288,2843],[-1505,3169],[-1567,3494],[-1397,3836],[-1086,3945],[-791,3851]
+    ],[ // Ophtalmology
+      [-77,2579],[-357,2687],[-512,2982],[-574,3479],[-496,3836],[-264,4007],[-62,3945],[62,3727],[155,3324],[171,3013],[93,2672],[-77,2579]
+    ],[ // Oncology
+      [218,3060],[357,2827],[823,2594],[1304,2563],[1940,2563],[2266,2827],[2453,3215],[2422,3727],[2422,3727],[2127,4038],[1351,4177],[1025,4146],[606,3945],[357,3743],[187,3494],[187,3494],[218,3060]
+    ],[ // Diabetes
+      [1428,2517],[1847,2532],[1847,2532],[2142,2206],[2111,2067],[1971,1911],[1754,1849],[1754,1849],[1521,1880],[1211,2222],[1273,2424],[1428,2517],[1428,2517]
+    ],[ // Reproductive medicine
+      [1382,1492],[1475,1430],[1692,1384],[1940,1446],[1987,1725],[1816,1818],[1816,1818],[1351,1803],[1289,1601],[1382,1492]
+    ],[ // Genetics
+      [2127,1880],[2127,1880],[2111,1539],[2282,902],[2515,639],[2825,530],[3229,437],[3694,530],[4207,856],[4455,1321],[4455,1321],[4362,2687],[4036,3122],[3462,3370],[3462,3370],[2577,3277],[2344,2905],[2251,2548],[2127,1880]
+    ],[ // Genetics > Tools
+      [4144,1135],[4020,980],[3819,825],[3477,716],[3136,809],[2996,1042],[3011,1306],[3167,1539],[3430,1694],[3850,1725],[4036,1694],[4207,1554],[4222,1461],[4144,1135]
+    ],[ // Microbes and pathogens
+      [3337,390],[3182,421],[2779,452],[2499,561],[2111,996],[1894,1259],[1490,1259],[1211,1042],[1242,685],[1242,685],[1304,266],[1925,-277],[2406,-386],[3073,-495],[3524,-277],[3524,-277],[3772,64],[3617,235],[3337,390]
+    ],[ // Remote sensing
+      [1009,-945],[1025,-1193],[1149,-1441],[1164,-1503],[1475,-1705],[1863,-1814],[2515,-1767],[2748,-1814],[3229,-1721],[3229,-1721],[3601,-1255],[3601,-1255],[3586,-1038],[3430,-836],[2918,-541],[2608,-479],[2282,-479],[2282,-479],[1646,-401],[1289,-479],[1102,-619],[1102,-619],[1040,-758],[1009,-945]
+    ],[ // Weather forcasting
+      [1987,-2016],[2158,-1876],[2561,-1891],[3337,-2326],[3462,-2792],[3337,-3226],[3089,-3428],[2670,-3583],[2111,-3490],[1723,-3102],[1661,-2621],[1801,-2295],[1801,-2295],[1987,-2016]
+    ],[ // Climatology and oceanography
+      [683,-1845],[1071,-1876],[1304,-1969],[1475,-2140],[1583,-2373],[1583,-2543],[1506,-2807],[1273,-2947],[916,-2807],[916,-2807],[683,-2559],[559,-2326],[621,-1891],[621,-1891],[683,-1845]
+    ],[ // Measuring the cosmos
+      [543,-2605],[311,-2668],[62,-3025],[-15,-3475],[-15,-3816],[218,-4127],[714,-4127],[823,-3940],[916,-3506],[932,-3273],[900,-3056],[869,-2885],[869,-2885],[792,-2792],[745,-2683],[543,-2605]
+    ],[ // Physics
+      [-124,-3506],[-93,-3288],[-93,-3288],[-124,-3056],[-512,-2761],[-745,-2652],[-978,-2683],[-1304,-2776],[-1490,-3025],[-1598,-3257],[-1490,-3583],[-1335,-3723],[-1335,-3723],[-1040,-3909],[-527,-3847],[-295,-3754],[-139,-3599],[-124,-3506]
+    ],[ // Quantum technology
+      [-1893,-3319],[-1738,-3056],[-1769,-2854],[-2018,-2621],[-2390,-2636],[-2685,-2807],[-2732,-3133],[-2638,-3444],[-2328,-3552],[-2157,-3506],[-2157,-3506],[-1893,-3319]
+    ],[ // Mathematics
+      [-1412,-2605],[-1583,-2543],[-1769,-2326],[-1862,-2016],[-1816,-1783],[-1459,-1612],[-1117,-1566],[-916,-1674],[-729,-1829],[-605,-2093],[-621,-2342],[-900,-2543],[-1102,-2652],[-1102,-2652],[-1412,-2605]
+    ],[ // Energy systems management
+      [-1893,-867],[-1987,-1224],[-2219,-1472],[-2576,-1705],[-2995,-1845],[-3446,-1829],[-3834,-1705],[-4051,-1457],[-4066,-1146],[-4066,-1146],[-3477,-603],[-3026,-526],[-2732,-541],[-2732,-541],[-2080,-603],[-2080,-603],[-1893,-867]
+    ],[ // Networks and signal processing
+      [-4222,964],[-3849,1275],[-3352,1337],[-2918,1290],[-2669,1166],[-2281,887],[-2080,576],[-2018,235],[-2142,-60],[-2561,-215],[-2561,-215],[-3477,-184],[-3818,-75],[-4160,235],[-4253,561],[-4253,561],[-4222,964]
+    ],[ // Social data science
+      [-1661,996],[-1723,561],[-1707,204],[-1381,-122],[-853,-246],[-372,-262],[47,33],[280,359],[249,701],[-62,1135],[-434,1477],[-791,1616],[-1086,1508],[-1428,1306],[-1428,1306],[-1661,996]
+    ],[ // Computer vision
+      [-3306,1353],[-2964,1042],[-2576,871],[-2157,747],[-1862,778],[-1598,918],[-1350,1089],[-1195,1368],[-1102,1756],[-1102,2113],[-1241,2439],[-1490,2656],[-1971,2843],[-2437,2843],[-2437,2843],[-3368,2501],[-3477,2129],[-3414,1678],[-3414,1678],[-3306,1353]
+    ],[ // Surgery
+      [-15,2563],[-186,2424],[-279,2284],[-279,2284],[-295,1896],[-46,1725],[357,1601],[357,1601],[776,1694],[776,1694],[885,2191],[776,2392],[575,2548],[373,2610],[124,2610],[124,2610],[-15,2563]
+    ]
+  ];
+
+
 
 /// RENDERER
 var newRenderer
@@ -305,6 +365,13 @@ newRenderer = function(){
     if (ns.settings.draw_cluster_labels) {
       layeredImage = ns.drawLayerOnTop(layeredImage,
         ns.drawClusterLabelsLayer(ns.settings)
+      )
+    }
+
+    // Draw polygons // Custom
+    if (ns.settings.draw_polygons) {
+      bgImage = ns.drawLayerOnTop(bgImage,
+        ns.drawPolygonsLayer(ns.settings)
       )
     }
 
@@ -511,7 +578,7 @@ newRenderer = function(){
       return ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
     } else {
       if (options.hillshading_hypsometric_gradient) {
-        let mid_threshold = 0.2
+        let mid_threshold = 0.18
         ns.log2("Draw hypsometric gradient...")
         let colorGradient = d3.scaleLinear()
           .domain([0, mid_threshold*0.8, mid_threshold*1.2, 1])
@@ -695,7 +762,6 @@ newRenderer = function(){
         for (y = 0; y <= height; y++ ){
           i = x + (width+1) * y
           d = Math.sqrt(Math.pow(nx - x, 2) + Math.pow(ny - y, 2))
-          d = Math.max(0, d-nsize) // In test
           h = 1 / (1+Math.pow(d/spread, 2))
           hPixelMap[i] = hPixelMap[i] + h
         }
@@ -767,13 +833,13 @@ newRenderer = function(){
     var southWestPoint = {x: margin_left, y:dim.h-margin_bottom}
     var westPoint = {x: southWestPoint.x, y: centerPoint.y}
     var southPoint = {x: centerPoint.x, y:southWestPoint.y}
-    var lineHeight = ns.pt_to_px(options.cc_font_size)
+    var lineHeight = ns.pt_to_pt(options.cc_font_size)
 
     if (C_max >= options.C_max_threshold) {
 
       // Draw the scale
       drawScaleV(ctx, westPoint.x+lineThickness/2, westPoint.y, Delta_max);
-      drawText(ctx, 'Δmax', westPoint.x+lineThickness/2 + ns.mm_to_px(.5) + textThickness, westPoint.y + 0.4*ns.pt_to_px(options.cc_font_size), "start");
+      drawText(ctx, 'Δmax', westPoint.x+lineThickness/2 + ns.mm_to_px(.5) + textThickness, westPoint.y + 0.4*ns.pt_to_pt(options.cc_font_size), "start");
 
       drawScaleH(ctx, southPoint.x, southPoint.y-lineThickness/2, Delta_max);
       drawText(ctx, 'Δmax', southPoint.x, southPoint.y-lineThickness/2 - textThickness, "center");
@@ -858,7 +924,7 @@ newRenderer = function(){
     // Internal methods
     function drawText(ctx, txt, x, y, textAlign) {
       ctx.textAlign = textAlign || "start";
-      ctx.font = ns.buildContextFontString(options.cc_font_weight, ns.pt_to_px(options.cc_font_size), options.cc_font_family)
+      ctx.font = ns.buildContextFontString(options.cc_font_weight, ns.pt_to_pt(options.cc_font_size), options.cc_font_family)
       ctx.lineWidth = textThickness;
       ctx.fillStyle = options.cc_text_border_color;
       ctx.strokeStyle = options.cc_text_border_color;
@@ -1296,7 +1362,7 @@ newRenderer = function(){
     ns.scaleContext(ctx)
 
     var clusterImprint = clusterImprints[modality]
-    
+
     const path = d3.geoPath(null, ctx)
     ctx.lineCap = "round"
     ctx.lineJoin = "round"
@@ -1327,6 +1393,56 @@ newRenderer = function(){
     var result = ns.mergeLayers(modalities.map(modality => ns.drawClusterContour(options, modality)))
     ns.report("...done.")
     return result
+  }
+
+  // Custom
+  ns.drawPolygonsLayer = function(options) {
+    ns.log("Draw polygons...")
+    
+    options = options || {}
+    options.polygon_contour_color_default = "#FFF"
+    options.polygon_contour_alpha = options.polygon_contour_alpha || .45
+    options.polygon_contour_thickness = options.polygon_contour_thickness || 4 // In mm
+    options.polygon_blur_radius = options.polygon_blur_radius || .4 // In mm
+
+    var g = ns.g
+    var dim = ns.getRenderingPixelDimensions()
+
+    var ctx = ns.createCanvas().getContext("2d")
+    ns.scaleContext(ctx)
+    
+    let bgColor = d3.color(options.polygon_contour_color_default)
+    bgColor.opacity = 1/128
+    ns.paintAll(ctx, bgColor.toString())
+
+    var color = d3.color(options.polygon_contour_color_default)
+    color.opacity = options.polygon_contour_alpha
+    var thickness = ns.mm_to_px(options.polygon_contour_thickness)
+
+    ctx.lineCap = "round"
+    ctx.lineJoin = "round"
+    ctx.lineWidth = thickness
+    ctx.fillStyle = 'rgba(255, 255, 255, 0)'
+
+    // TODO
+    basemapPolygons.forEach(polygon => {
+      ctx.beginPath()
+      const path = d3.geoPath(null, ctx)
+      ctx.beginPath()
+      path({type: "LineString", coordinates: polygon})
+      ctx.strokeStyle = color.toString()
+      ctx.stroke()
+    })
+    
+
+    // Blur
+    let imgd = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
+    var blurRadius = ns.mm_to_px(options.polygon_blur_radius) * ns.settings.tile_factor
+    imgd = ns.blur(imgd, blurRadius, ctx)
+
+    ns.report("...done.")
+    
+    return imgd
   }
 
   ns.getNetworkShapeImprint = function() {
@@ -1588,7 +1704,7 @@ newRenderer = function(){
 
       // Precompute the label
       var count = nodeCountByModality[modality]
-      var fontSize = ns.pt_to_px( options.cluster_label_sized
+      var fontSize = ns.pt_to_pt( options.cluster_label_sized
         ? Math.floor(options.cluster_label_font_min_size + (count - label_clusterSizeExtent[0]) * (options.cluster_label_font_max_size - options.cluster_label_font_min_size) / (label_clusterSizeExtent[1] - label_clusterSizeExtent[0]))
         : Math.floor(0.8 * options.cluster_label_font_min_size + 0.2 * options.cluster_label_font_max_size)
       )
@@ -1657,7 +1773,7 @@ newRenderer = function(){
     return ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
   }
 
-  ns.getNormalizeFontSize = function(options, bolder) {
+  ns.getNormalizeFontSize = function(options) {
     options = options || {}
     options.label_font_thickness = options.label_font_thickness || .3 // In mm
 
@@ -1672,12 +1788,6 @@ newRenderer = function(){
 
     // We restrain the size to the proper steps of the scale
     var text_thickness = ns.mm_to_px(options.label_font_thickness)
-
-    // Custom: bolder
-    if (bolder) {
-      text_thickness *= 2
-    }
-
     var normalizeFontSize = function(size) {
       // The target thickness is the pen size, which is fixed: text_thickness
       // But to compute the weight, we must know the thickness for a standard size: 1
@@ -1700,9 +1810,9 @@ newRenderer = function(){
   ns.tuneColorForLabel = function(c) {
     var options = {}
     options.label_color_min_C = 0
-    options.label_color_max_C = 70
+    options.label_color_max_C = 50
     options.label_color_min_L = 2
-    options.label_color_max_L = 50
+    options.label_color_max_L = 35
     var hcl = d3.hcl(c)
     hcl.c = Math.max(hcl.c, options.label_color_min_C)
     hcl.c = Math.min(hcl.c, options.label_color_max_C)
@@ -1736,7 +1846,7 @@ newRenderer = function(){
     options.label_path_downhill = true
     options.label_path_center = false
     options.label_path_starting_angle_range = Math.PI/2 // From 0 (horizontal) to PI (any angle)
-    options.label_path_step_angle_range = 0.33 // Curvature per font size. 0 is straight.
+    options.label_path_step_angle_range = Math.PI/64 // From 0 (straight) to PI (any curvature)
 
     var g = ns.g
     var dim = ns.getRenderingPixelDimensions()
@@ -1753,7 +1863,6 @@ newRenderer = function(){
     var labelsStack = []
     var borderThickness = ns.mm_to_px(options.label_border_thickness)
     var labelPaths = (options.label_curved_path)?(ns.getLabelPaths(options)):(false)
-    let drawnMinFontSize = Infinity
     visibleLabels.forEach(function(nid){
 
       var n = g.getNodeAttributes(nid)
@@ -1768,11 +1877,8 @@ newRenderer = function(){
       }
 
       // Precompute the label
-      ctx.font = ns.buildLabelFontContext(options, n.size, n.important) // Custom: important
+      ctx.font = ns.buildLabelFontContext(options, n.size)
       var fontSize = +ctx.font.split('px')[0]
-      if (!isNaN(fontSize)) {
-        drawnMinFontSize = Math.min(drawnMinFontSize, fontSize)
-      }
 
       // Then, draw the label only if wanted
       var radius = Math.max(options.node_size * n.size, 2)
@@ -1840,7 +1946,6 @@ newRenderer = function(){
       }
     })
 
-    console.log("FONT SIZE MIN (DRAWN) (pt): ", ns.px_to_pt(drawnMinFontSize))
     ns.report("...done.")
     return ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height)
   }
@@ -1863,15 +1968,15 @@ newRenderer = function(){
     return nodeSizeExtent
   }
 
-  ns.buildLabelFontContext = function(options, node_size, bolder) { // Custom: bolder
+  ns.buildLabelFontContext = function(options, node_size) {
     var nodeSizeExtent = ns.getNodeSizeExtent()
-    var fontSize = ns.pt_to_px( options.sized_labels
+    var fontSize = ns.pt_to_pt( options.sized_labels
       ? Math.floor(options.label_font_min_size + (node_size - nodeSizeExtent[0]) * (options.label_font_max_size - options.label_font_min_size) / (nodeSizeExtent[1] - nodeSizeExtent[0]))
       : Math.floor(0.8 * options.label_font_min_size + 0.2 * options.label_font_max_size)
     )
     
     // sw: Size and weight
-    var normalizeFontSize = ns.getNormalizeFontSize(options, bolder) // Custom: bolder
+    var normalizeFontSize = ns.getNormalizeFontSize(options)
     var sw = normalizeFontSize(fontSize)
     if (!options.true_size) {
       fontSize = sw[0]
@@ -1916,7 +2021,7 @@ newRenderer = function(){
     options.label_path_monitor_field = false
     options.label_path_monitor = false
     options.node_size = (options.node_size===undefined)?(1):(options.node_size)
-    options.label_node_space_ratio = 0.08 // ratio of node size
+    options.label_node_space_ratio = 0.05 // ratio of node size
 
     // Cache
     if (ns._labelPaths) {
@@ -2070,10 +2175,8 @@ newRenderer = function(){
       }
 
       var label = ns.tuneLabelString(n.label, options)
-      ctx.font = ns.buildLabelFontContext(options, n.size, n.important) // Custom: important
-      let fontSize = +ctx.font.replace('bold ', '').split('px')[0]
-      let maxCurvature = options.label_path_step_angle_range / ns.px_to_pt(fontSize)
-
+      ctx.font = ns.buildLabelFontContext(options, n.size)
+      
       // Let's get the label length
       var labelLength = ctx.measureText(label).width
 
@@ -2084,24 +2187,20 @@ newRenderer = function(){
       // Set the central segment
       var i = Math.floor(nx*settings.tile_factor) + Math.floor(ny*settings.tile_factor)*dim.w*ns.settings.tile_factor
       originalAngle = Math.atan2(dyPixelMap[i], dxPixelMap[i])
-      if (n.labelStartAngle !== undefined) {
-        angle = -n.labelStartAngle // The minus sign is to stick to the trigonometric convention for the label
+      if (options.label_path_downhill) {
+        angle = Math.atan2(dyPixelMap[i], dxPixelMap[i])
       } else {
-        if (options.label_path_downhill) {
-          angle = Math.atan2(dyPixelMap[i], dxPixelMap[i])
-        } else {
-          angle = Math.atan2(dxPixelMap[i], -dyPixelMap[i])
-        }
-        // Note: angle is in [-PI, PI] at this stage
-        if (Math.PI/2 < angle && angle < Math.PI - options.label_path_starting_angle_range/2) {
-          angle = Math.PI - options.label_path_starting_angle_range/2
-        } else if (options.label_path_starting_angle_range/2 < angle && angle < Math.PI/2 ) {
-          angle = options.label_path_starting_angle_range/2
-        } else if (-Math.PI/2 < angle && angle < -options.label_path_starting_angle_range/2 ) {
-          angle = -options.label_path_starting_angle_range/2
-        } else if (-Math.PI + options.label_path_starting_angle_range/2 < angle && angle < -Math.PI/2 ) {
-          angle = -Math.PI + options.label_path_starting_angle_range/2
-        }
+        angle = Math.atan2(dxPixelMap[i], -dyPixelMap[i])
+      }
+      // Note: angle is in [-PI, PI] at this stage
+      if (Math.PI/2 < angle && angle < Math.PI - options.label_path_starting_angle_range/2) {
+        angle = Math.PI - options.label_path_starting_angle_range/2
+      } else if (options.label_path_starting_angle_range/2 < angle && angle < Math.PI/2 ) {
+        angle = options.label_path_starting_angle_range/2
+      } else if (-Math.PI/2 < angle && angle < -options.label_path_starting_angle_range/2 ) {
+        angle = -options.label_path_starting_angle_range/2
+      } else if (-Math.PI + options.label_path_starting_angle_range/2 < angle && angle < -Math.PI/2 ) {
+        angle = -Math.PI + options.label_path_starting_angle_range/2
       }
 
       var initAngle = angle
@@ -2128,10 +2227,10 @@ newRenderer = function(){
         while (angleDiff > Math.PI) {
           angleDiff -= 2*Math.PI
         }
-        if (angleDiff > maxCurvature) {
-          angleDiff = maxCurvature
-        } else if (angleDiff < -maxCurvature) {
-          angleDiff = -maxCurvature
+        if (angleDiff > options.label_path_step_angle_range) {
+          angleDiff = options.label_path_step_angle_range
+        } else if (angleDiff < -options.label_path_step_angle_range) {
+          angleDiff = -options.label_path_step_angle_range
         }
         angle = lastAngle + angleDiff
         path.push([point[0]+step_length*Math.cos(angle), point[1]+step_length*Math.sin(angle), originalAngle])
@@ -2158,10 +2257,10 @@ newRenderer = function(){
           while (angleDiff > Math.PI) {
             angleDiff -= 2*Math.PI
           }
-          if (angleDiff > maxCurvature) {
-            angleDiff = maxCurvature
-          } else if (angleDiff < -maxCurvature) {
-            angleDiff = -maxCurvature
+          if (angleDiff > options.label_path_step_angle_range) {
+            angleDiff = options.label_path_step_angle_range
+          } else if (angleDiff < -options.label_path_step_angle_range) {
+            angleDiff = -options.label_path_step_angle_range
           }
           angle = lastAngle + angleDiff
           path.unshift([point[0]-step_length*Math.cos(angle), point[1]-step_length*Math.sin(angle), originalAngle])
@@ -2224,7 +2323,6 @@ newRenderer = function(){
 
     options = options || {}
     options.label_collision_pixmap_max_resolution = options.label_collision_pixmap_max_resolution || 10000000 // 10 megapixel
-    options.label_collision_include_node = true
     // For monitoring
     options.download_image = false // For monitoring the process
 
@@ -2266,16 +2364,16 @@ newRenderer = function(){
     // Evaluate labels
     var labelDrawCount = options.label_count
     var offset = ns.mm_to_px(options.label_spacing_offset)
-    var stroke_width = ns.mm_to_px(options.node_stroke_width || 0)
     var count = 0
     nodesBySize
+    .filter(nid => g.getNodeAttribute(nid, "showLabel")) // Custom
     .forEach(function(nid){
-      var n = g.getNodeAttributes(nid)
-      if (labelDrawCount > 0 || n.important) { // Custom: important
+      if (labelDrawCount > 0) {
+        var n = g.getNodeAttributes(nid)
         var nx = n.x
         var ny = n.y
 
-        ctx.font = ns.buildLabelFontContext(options, n.size, n.important) // Custom: important
+        ctx.font = ns.buildLabelFontContext(options, n.size)
         var fontSize = +ctx.font.replace('bold ', '').split('px')[0]
         var label = ns.tuneLabelString(n.label, options)
 
@@ -2369,10 +2467,10 @@ newRenderer = function(){
           }
         } else {
           collision = true
-          // console.log("Warning: path of length 0 for "+nid+" ("+label+"):")
+          console.log("Warning: path of length 0 for "+nid+" ("+label+"):")
         }
 
-        if (!collision || n.important) { // Custom: important
+        if (!collision) {
           // Draw the bounding area on that canvas
           ctx.strokeStyle = '#FFF'
           ctx.lineCap = 'round';
@@ -2389,16 +2487,6 @@ newRenderer = function(){
             ctx.lineTo(x, y)
           }
           ctx.stroke()
-
-          // Draw the node itself if needed
-          if (options.label_collision_include_node) {
-            var radius = Math.max(options.node_size * n.size, stroke_width)
-            ctx.beginPath()
-            ctx.arc(n.x, n.y, radius - 0.5*stroke_width, 0, 2 * Math.PI, false)
-            ctx.lineWidth = 0
-            ctx.fillStyle = '#FFF'
-            ctx.fill()
-          }
 
           // Update count
           labelDrawCount--
@@ -2709,7 +2797,7 @@ newRenderer = function(){
     }
 
     // Draw each edge
-    // var color = d3.color(options.edge_color) // Custom. See below: edges colored as their target
+    var color = d3.color(options.edge_color)
     var thickness = ns.mm_to_px(options.edge_thickness)
     var jitter = ns.mm_to_px(options.edge_path_jitter)
     var tf = ns.settings.tile_factor
@@ -2720,8 +2808,6 @@ newRenderer = function(){
       g.edges()
         .filter(function(eid, i_){ return i_ < options.max_edge_count })
         .forEach(function(eid, i_){
-          // Custom: edge colored as target
-          var color = d3.color(ns.getNodeColor(options, g.getNodeAttributes(g.target(eid))))
           if ((i_+1)%10000 == 0) {
             console.log("..."+(i_+1)/1000+"K edges drawn...")
           }
@@ -2729,7 +2815,7 @@ newRenderer = function(){
           var n_t = g.getNodeAttributes(g.target(eid))
           var path, i, x, y, o, dpixi, lastdpixi, lasto, pixi, pi
           var edgeOpacity = (g.getEdgeAttribute(eid, 'opacity')===undefined)?(1.):(g.getEdgeAttribute(eid, 'opacity'))
-
+          var edgeThickness = thickness * ((g.getEdgeAttribute(eid, 'weight')===undefined)?(1.):(g.getEdgeAttribute(eid, 'weight')))
           // Build path
           var d = Math.sqrt(Math.pow(n_s.x - n_t.x, 2) + Math.pow(n_s.y - n_t.y, 2))
           var angle = Math.atan2( n_t.y - n_s.y, n_t.x - n_s.x )
@@ -2812,7 +2898,7 @@ newRenderer = function(){
             o = path[i+2]/255
 
             if (lastx) {
-              ctx.lineWidth = thickness * (0.9 + 0.2*Math.random())
+              ctx.lineWidth = edgeThickness * (0.9 + 0.2*Math.random())
               color.opacity = edgeOpacity*(lasto+o)/2
               ctx.beginPath()
               ctx.strokeStyle = color.toString()
@@ -2852,14 +2938,6 @@ newRenderer = function(){
     nodesBySize.sort(function(naid, nbid){
       var na = g.getNodeAttributes(naid)
       var nb = g.getNodeAttributes(nbid)
-      
-      // Custom (important)
-      if (na.important) {
-        return -1
-      } else if (nb.important) {
-        return 1
-      }
-
       if ( na.size < nb.size ) {
         return 1
       } else if ( na.size > nb.size ) {
@@ -3078,33 +3156,31 @@ newRenderer = function(){
         var progress = 1-steps/totalSteps
         var layerOpacity = gradient(progress)
         
-        ns.getNodesBySize()
-          .filter(nid => g.getNodeAttribute(nid, 'drawShadow')) // Custom filter
-          .forEach(function(nid){
-            var n = g.getNodeAttributes(nid)
+        ns.getNodesBySize().forEach(function(nid){
+          var n = g.getNodeAttributes(nid)
 
-            // Color
-            var color = d3.color(ns.getNodeColor(options, n))
+          // Color
+          var color = d3.color(ns.getNodeColor(options, n))
 
-            // Tune the color to be a bit more vivid, a bit less dark
-            var hsl = d3.hsl(color)
-            hsl.l = Math.min(1, hsl.l * 1.2)
-            hsl.s = Math.min(1, hsl.s * 1.1)
+          // Tune the color to be a bit more vivid, a bit less dark
+          var hsl = d3.hsl(color)
+          hsl.l = Math.min(1, hsl.l * 1.2)
+          hsl.s = Math.min(1, hsl.s * 1.1)
 
-            // Bluriness (actually whiteness)
-            hsl.l = (1-layerOpacity)*1 + layerOpacity*hsl.l
+          // Bluriness (actually whiteness)
+          hsl.l = (1-layerOpacity)*1 + layerOpacity*hsl.l
 
-            color = d3.color(hsl)
-            
-            color.opacity = .5 // Blending
+          color = d3.color(hsl)
+          
+          color.opacity = .5 // Blending
 
-            var radius = radiusRatio * options.node_size * n.size + radiusOffset
+          var radius = radiusRatio * options.node_size * n.size + radiusOffset
 
-            ctx.fillStyle = color.toString()
-            ctx.beginPath()
-            ctx.arc(n.x, n.y, radius, 0, 2 * Math.PI, false)
-            ctx.fill()
-          })
+          ctx.fillStyle = color.toString()
+          ctx.beginPath()
+          ctx.arc(n.x, n.y, radius, 0, 2 * Math.PI, false)
+          ctx.fill()
+        })
       }
 
       // Blur
@@ -3369,11 +3445,23 @@ newRenderer = function(){
         var n = g.getNodeAttributes(nid)
         n.x = -n.x
       })
+      // Custom
+      basemapPolygons.forEach(p => {
+        p.forEach(xy => {
+          xy[0] = -xy[0]
+        })
+      })
     }
     if (options.flip_y) {
       g.nodes().forEach(function(nid){
         var n = g.getNodeAttributes(nid)
         n.y = -n.y
+      })
+      // Custom
+      basemapPolygons.forEach(p => {
+        p.forEach(xy => {
+          xy[1] = -xy[1]
+        })
       })
     }
 
@@ -3393,6 +3481,16 @@ newRenderer = function(){
         let angle = pol.radians + theta
         n.x = d * Math.cos(angle)
         n.y = d * Math.sin(angle)
+      })
+      // Custom
+      basemapPolygons.forEach(p => {
+        p.forEach(xy => {
+          let pol = cartesian2Polar(xy[0],xy[1])
+          let d = pol.dist
+          let angle = pol.radians + theta
+          xy[0] = d * Math.cos(angle)
+          xy[1] = d * Math.sin(angle)
+        })
       })
     }
 
@@ -3458,6 +3556,13 @@ newRenderer = function(){
       n.x = m.l + (dim.w-m.r-m.l) / 2 + (n.x - xcenter) * ratio
       n.y = m.t + (dim.h-m.t-m.b) / 2 + (n.y - ycenter) * ratio
       n.size *= ratio
+    })
+    // Custom
+    basemapPolygons.forEach(p => {
+      p.forEach(xy => {
+        xy[0] = m.l + (dim.w-m.r-m.l) / 2 + (xy[0] - xcenter) * ratio
+        xy[1] = m.t + (dim.h-m.t-m.b) / 2 + (xy[1] - ycenter) * ratio
+      })
     })
 
     ns.report("...done.")
@@ -3577,12 +3682,8 @@ newRenderer = function(){
     return d * ns.settings.rendering_dpi * 0.0393701 / ns.settings.tile_factor
   }
 
-  ns.pt_to_px = function(d) {
+  ns.pt_to_pt = function(d) {
     return Math.round(1000 * d * ns.settings.rendering_dpi / ( 72 * ns.settings.tile_factor )) / 1000
-  }
-
-  ns.px_to_pt = function(d) {
-    return Math.round(1000 * d * ( 72 * ns.settings.tile_factor ) / ns.settings.rendering_dpi) / 1000
   }
 
   ns.downloadImageData = function(imgd, name) {
@@ -3817,5 +3918,5 @@ newRenderer = function(){
 
 /// FINALLY, RENDER
 let renderer = newRenderer()
-renderer.renderAndSave(g, settings, 'Carto Large') // Custom
+renderer.renderAndSave(g, settings, "nodes")
 // renderer.renderAndSaveAllTiles(g, settings)

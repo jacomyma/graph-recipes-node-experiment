@@ -8,8 +8,7 @@ const d3 = require('d3')
 // Read file
 var gexf_string;
 try {
-    gexf_string = fs.readFileSync('data/network_spat.gexf', 'utf8');
-    // gexf_string = fs.readFileSync('data/test.gexf', 'utf8');
+    gexf_string = fs.readFileSync('data/airports.gexf', 'utf8');
     console.log('GEXF file loaded');    
 } catch(e) {
     console.log('Error:', e.stack);
@@ -34,14 +33,14 @@ var settings = {}
 settings.flip_x = false
 settings.flip_y = true
 settings.rotate = 0 // In degrees, clockwise
-settings.margin_top    = 24 // in mm
-settings.margin_right  = 24 // in mm
-settings.margin_bottom = 24 // in mm
-settings.margin_left   = 24 // in mm
+settings.margin_top    = 6 // in mm
+settings.margin_right  = 6 // in mm
+settings.margin_bottom = 6 // in mm
+settings.margin_left   = 6 // in mm
 
 // Image size and resolution
-settings.image_width = 1600 // in mm. Default: 200mm (fits in a A4 page)
-settings.image_height = 1200
+settings.image_width = 400 // in mm. Default: 200mm (fits in a A4 page)
+settings.image_height = 290
 settings.output_dpi = 300 // Dots per inch.
 settings.rendering_dpi = 300 // Default: same as output_dpi. You can over- or under-render to tweak quality and speed.
 
@@ -55,20 +54,20 @@ settings.tile_to_render = [0, 0] // Grid coordinates, as integers
 // Decide which layers are drawn.
 // The settings for each layer are below.
 settings.draw_background            = true
-settings.draw_hillshading           = true
+settings.draw_hillshading           = false
 settings.draw_network_shape_fill    = false
 settings.draw_network_shape_contour = false
 settings.draw_cluster_fills         = false
 settings.draw_cluster_contours      = false
 settings.draw_cluster_labels        = false
-settings.draw_edges                 = false
+settings.draw_edges                 = true
 settings.draw_node_shadows          = true
 settings.draw_nodes                 = true
 settings.draw_node_labels           = true
 settings.draw_connected_closeness   = false
 
 // Layer: Background
-settings.background_color = "#fafaf7"
+settings.background_color = "#ffffff"
 
 // Layer: Connected-closeness
 settings.cc_text_color = "#283535"
@@ -120,56 +119,157 @@ settings.cluster_label_inner_color = "#ffffff" // Note: here color is on the bor
 
 // Layer: Edges
 settings.max_edge_count = Infinity
-settings.edge_thickness = 0.01 // in mm
-settings.edge_alpha = .25 // Opacity // Range from 0 to 1
-settings.edge_curved = true
+settings.edge_thickness = 0.015 // in mm
+settings.edge_alpha = 1. // Opacity // Range from 0 to 1
+settings.edge_curved = false
 settings.edge_high_quality = true // Halo around nodes // Time-consuming
-settings.edge_color = "#6b7660"
+settings.edge_color = "#b6b8c4"
 
 // Layer: Node shadows
 settings.node_color_shadow_offset = 6 // mm; larger than you'd think (gradient)
-settings.node_color_shadow_opacity = .5
+settings.node_color_shadow_opacity = 1.0
 settings.node_color_shadow_blur_radius = 6 // mm
 
 // Layer: Nodes
 settings.adjust_voronoi_range = 100 // Factor // Larger node halo
 settings.node_size = 1. // Factor to adjust the nodes drawing size
-settings.node_color_original = true // Use the original node color
-settings.node_color_by_modalities = false // Use the modalities to color nodes (using settings.node_clusters)
+settings.node_color_original = false // Use the original node color
+settings.node_color_by_modalities = true // Use the modalities to color nodes (using settings.node_clusters)
 settings.node_stroke_width = 0.01 // mm
 settings.node_stroke_color = "#FFFFFF"
-settings.node_fill_color = "#283535"
+settings.node_fill_color = "#171637"
 
 // Layer: Node labels
-settings.label_color = "#283535"
-settings.label_color_from_node = true
+settings.label_color = "#6666AA"
+settings.label_color_from_node = false
 settings.label_count = 1500
 settings.label_max_length = 42 // Number of characters before truncate. Infinity is a valid value.
 settings.label_font_family = "Raleway"
-settings.label_font_min_size = 7 // in pt
-settings.label_font_max_size = 18  // in pt
-settings.label_font_thickness = .32
-settings.label_border_thickness = .7 // in mm
-settings.label_spacing_offset = 1.5 // in mm (prevents label overlap)
+settings.label_font_min_size = 4 // in pt
+settings.label_font_max_size = 8  // in pt
+settings.label_font_thickness = .14
+settings.label_border_thickness = .6 // in mm
+settings.label_spacing_offset = 2.4 // in mm (prevents label overlap)
 settings.label_border_color = "#FFFFFF"
-settings.label_curved_path = true // Curved labels
+settings.label_curved_path = false // Curved labels
 
 // Main clusters and color code:
 // Clusters are defined by the modalities of a given attribute.
 // This specifies which is this attribute, and which
 // modalities have which colors. You can generate this
 // JSON object with the PREPARE script.
-settings.node_clusters = {
-  "attribute_id": "couleur politique",
+/*settings.node_clusters = {
+  "attribute_id": "country",
   "modalities": {
+    "United States": {
+      "label": "United States",
+      "count": 551,
+      "color": "#6fc5a4"
+    },
+    "Canada": {
+      "label": "Canada",
+      "count": 206,
+      "color": "#f26b6e"
+    },
+    "China": {
+      "label": "China",
+      "count": 173,
+      "color": "#b9a2ce"
+    },
+    "Brazil": {
+      "label": "Brazil",
+      "count": 118,
+      "color": "#e8a74b"
+    },
+    "Australia": {
+      "label": "Australia",
+      "count": 112,
+      "color": "#658ec9"
+    },
+    "Russia": {
+      "label": "Russia",
+      "count": 103,
+      "color": "#f2a5a6"
+    },
+    "India": {
+      "label": "India",
+      "count": 70,
+      "color": "#4aa05b"
+    },
+    "Indonesia": {
+      "label": "Indonesia",
+      "count": 63,
+      "color": "#b65887"
+    },
+    "Japan": {
+      "label": "Japan",
+      "count": 62,
+      "color": "#7169af"
+    }
   },
-  "default_color": "#afafac"
+  "default_color": "#9d9b99"
+}*/
+settings.node_clusters = {
+  "attribute_id": "modularity_class",
+  "modalities": {
+    "0": {
+      "label": "0",
+      "count": 636,
+      "color": "#6fc5a4"
+    },
+    "1": {
+      "label": "1",
+      "count": 548,
+      "color": "#b9a2ce"
+    },
+    "2": {
+      "label": "2",
+      "count": 446,
+      "color": "#e8a74b"
+    },
+    "3": {
+      "label": "3",
+      "count": 296,
+      "color": "#658ec9"
+    },
+    "4": {
+      "label": "4",
+      "count": 573,
+      "color": "#f26b6e"
+    },
+    "5": {
+      "label": "5",
+      "count": 164,
+      "color": "#4aa05b"
+    },
+    "6": {
+      "label": "6",
+      "count": 199,
+      "color": "#ce6028"
+    },
+    "7": {
+      "label": "7",
+      "count": 173,
+      "color": "#f2a5a6"
+    },
+    "8": {
+      "label": "8",
+      "count": 69,
+      "color": "#7169af"
+    },
+    "16": {
+      "label": "16",
+      "count": 110,
+      "color": "#b65887"
+    }
+  },
+  "default_color": "#9d9b99"
 }
 
 // Advanced settings
-settings.voronoi_range = 1.2 // Halo size in mm
+settings.voronoi_range = 4 // Halo size in mm
 settings.voronoi_resolution_max = 1 * Math.pow(10, 7) // in pixel. 10^7 still quick, 10^8 better quality 
-settings.heatmap_resolution_max = 1 * Math.pow(10, 6) // in pixel. 10^5 quick. 10^7 nice but super slow.
+settings.heatmap_resolution_max = 1 * Math.pow(10, 5) // in pixel. 10^5 quick. 10^7 nice but super slow.
 settings.heatmap_spreading = (settings.image_width - settings.margin_left - settings.margin_right) / 196 // in mm
 
 // Experimental stuff
@@ -191,7 +291,7 @@ g.nodes().forEach(nid => {
 // For shadow
 g.nodes().forEach(nid => {
   let n = g.getNodeAttributes(nid)
-  n.drawShadow = n.colored == "yes"
+  n.drawShadow = settings.node_clusters.modalities[n[settings.node_clusters.attribute_id]] !== undefined
 })
 
 /// RENDERER
@@ -2709,7 +2809,7 @@ newRenderer = function(){
     }
 
     // Draw each edge
-    // var color = d3.color(options.edge_color) // Custom. See below: edges colored as their target
+    var color = d3.color(options.edge_color)
     var thickness = ns.mm_to_px(options.edge_thickness)
     var jitter = ns.mm_to_px(options.edge_path_jitter)
     var tf = ns.settings.tile_factor
@@ -2721,7 +2821,7 @@ newRenderer = function(){
         .filter(function(eid, i_){ return i_ < options.max_edge_count })
         .forEach(function(eid, i_){
           // Custom: edge colored as target
-          var color = d3.color(ns.getNodeColor(options, g.getNodeAttributes(g.target(eid))))
+          // var color = d3.color(ns.getNodeColor(options, g.getNodeAttributes(g.target(eid))))
           if ((i_+1)%10000 == 0) {
             console.log("..."+(i_+1)/1000+"K edges drawn...")
           }
@@ -3079,7 +3179,7 @@ newRenderer = function(){
         var layerOpacity = gradient(progress)
         
         ns.getNodesBySize()
-          .filter(nid => g.getNodeAttribute(nid, 'drawShadow')) // Custom filter
+          .filter(nid => g.getNodeAttribute(nid, "drawShadow"))
           .forEach(function(nid){
             var n = g.getNodeAttributes(nid)
 
@@ -3817,5 +3917,5 @@ newRenderer = function(){
 
 /// FINALLY, RENDER
 let renderer = newRenderer()
-renderer.renderAndSave(g, settings, 'Carto Large') // Custom
+renderer.renderAndSave(g, settings, 'Airports 06 modularity') // Custom
 // renderer.renderAndSaveAllTiles(g, settings)
